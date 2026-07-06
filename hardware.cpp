@@ -72,27 +72,33 @@ void setupHardware() {
   u8g2.clearBuffer();
 }
 
-// Debounce para botões
+// Debounce para botões corrigido
 bool buttonPressed(uint8_t pin) {
   static unsigned long lastDebounceTime[4] = {0, 0, 0, 0};
   static bool lastState[4] = {HIGH, HIGH, HIGH, HIGH};
   static uint8_t pinMap[4] = {BTN_UP, BTN_DOWN, BTN_SELECT, BTN_BACK};
   
   uint8_t idx = 0;
-  for (int i = 0; i < 4; i++) if (pinMap[i] == pin) idx = i;
-  
-  bool reading = digitalRead(pin);
-  if (reading != lastState[idx]) {
-    lastDebounceTime[idx] = millis();
-  }
-  
-  if ((millis() - lastDebounceTime[idx]) > 200) {
-    if (reading == LOW && lastState[idx] == HIGH) {
-      lastState[idx] = reading;
-      return true;
+  for (int i = 0; i < 4; i++) {
+    if (pinMap[i] == pin) {
+      idx = i;
+      break;
     }
   }
   
-  lastState[idx] = reading;
-  return false;
+  bool reading = digitalRead(pin);
+  bool pressed = false;
+  
+  // Se o estado mudou e já passou o tempo de debounce (150ms)
+  if (reading != lastState[idx] && (millis() - lastDebounceTime[idx]) > 150) {
+    lastDebounceTime[idx] = millis(); // Atualiza o cronômetro
+    lastState[idx] = reading;         // Salva o novo estado
+    
+    // Como os botões usam INPUT_PULLUP, a leitura de um clique é LOW
+    if (reading == LOW) {
+      pressed = true;
+    }
+  }
+  
+  return pressed;
 }
