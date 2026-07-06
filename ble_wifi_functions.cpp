@@ -1,5 +1,7 @@
 #include "config.h"
 
+bool buttonPressed(uint8_t pin);
+
 // ==================== BLE SCANNER ====================
 namespace {
   BLEScan* pBLEScan;
