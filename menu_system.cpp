@@ -1,0 +1,139 @@
+#include "config.h"
+
+#define MENU_ITEMS 8
+
+const char* menu_names[MENU_ITEMS] = {
+  "nRF24 Scanner",
+  "nRF24 Jammer", 
+  "CC1101 Scan",
+  "CC1101 RX/TX",
+  "BLE Scan",
+  "WiFi Deauth",
+  "Sour Apple",
+  "Configuracoes"
+};
+
+void (*menu_setup_funcs[MENU_ITEMS])();
+void (*menu_loop_funcs[MENU_ITEMS])();
+
+extern void nrfScannerSetup();
+extern void nrfScannerLoop();
+extern void nrfJammerSetup();
+extern void nrfJammerLoop();
+extern void cc1101ScannerSetup();
+extern void cc1101ScannerLoop();
+extern void cc1101TransceiverSetup();
+extern void cc1101TransceiverLoop();
+extern void bleScanSetup();
+extern void bleScanLoop();
+extern void wifiDeauthSetup();
+extern void wifiDeauthLoop();
+extern void sourAppleSetup();
+extern void sourAppleLoop();
+extern void settingsSetup();
+extern void settingsLoop();
+
+void initMenuSystem() {
+  menu_setup_funcs[0] = nrfScannerSetup;
+  menu_loop_funcs[0] = nrfScannerLoop;
+  
+  menu_setup_funcs[1] = nrfJammerSetup;
+  menu_loop_funcs[1] = nrfJammerLoop;
+  
+  menu_setup_funcs[2] = cc1101ScannerSetup;
+  menu_loop_funcs[2] = cc1101ScannerLoop;
+  
+  menu_setup_funcs[3] = cc1101TransceiverSetup;
+  menu_loop_funcs[3] = cc1101TransceiverLoop;
+  
+  menu_setup_funcs[4] = bleScanSetup;
+  menu_loop_funcs[4] = bleScanLoop;
+  
+  menu_setup_funcs[5] = wifiDeauthSetup;
+  menu_loop_funcs[5] = wifiDeauthLoop;
+  
+  menu_setup_funcs[6] = sourAppleSetup;
+  menu_loop_funcs[6] = sourAppleLoop;
+  
+  menu_setup_funcs[7] = settingsSetup;
+  menu_loop_funcs[7] = settingsLoop;
+}
+
+void drawMenu() {
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_6x10_tr);
+  
+  // Título
+  u8g2.drawStr(30, 10, "nRF-BOX Pro");
+  u8g2.drawHLine(0, 12, 128);
+  
+  // Itens do menu (mostra 4 por vez)
+  int start = (current_menu_item / 4) * 4;
+  for (int i = 0; i < 4; i++) {
+    int idx = start + i;
+    if (idx >= MENU_ITEMS) break;
+    
+    int y = 25 + (i * 12);
+    
+    if (idx == current_menu_item) {
+      u8g2.drawBox(0, y-9, 128, 11);
+      u8g2.setDrawColor(0);
+    }
+    
+    u8g2.setCursor(5, y);
+    u8g2.print(menu_names[idx]);
+    u8g2.setDrawColor(1);
+  }
+  
+  // Indicador de página
+  int total_pages = (MENU_ITEMS + 3) / 4;
+  int current_page = current_menu_item / 4;
+  u8g2.setCursor(110, 60);
+  u8g2.print(current_page + 1);
+  u8g2.print("/");
+  u8g2.print(total_pages);
+  
+  u8g2.sendBuffer();
+}
+
+void handleMenu() {
+  if (buttonPressed(BTN_UP)) {
+    if (current_menu_item > 0) {
+      current_menu_item--;
+      drawMenu();
+    }
+  }
+  
+  if (buttonPressed(BTN_DOWN)) {
+    if (current_menu_item < MENU_ITEMS - 1) {
+      current_menu_item++;
+      drawMenu();
+    }
+  }
+  
+  if (buttonPressed(BTN_SELECT)) {
+    current_screen = 1;
+    u8g2.clearBuffer();
+    u8g2.drawStr(10, 30, "Carregando...");
+    u8g2.sendBuffer();
+    
+    if (menu_setup_funcs[current_menu_item]) {
+      menu_setup_funcs[current_menu_item]();
+    }
+  }
+}
+
+void runCurrentFunction() {
+  if (menu_loop_funcs[current_menu_item]) {
+    menu_loop_funcs[current_menu_item]();
+  }
+  
+  // Botão BACK retorna ao menu
+  if (buttonPressed(BTN_BACK)) {
+    current_screen = 0;
+    // Desativa todos os rádios ao sair
+    radio.powerDown();
+    ELECHOUSE_cc1101.setSidle();
+    ESP.restart(); // Reinicia para limpar estados
+  }
+}
