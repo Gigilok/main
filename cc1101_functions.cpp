@@ -1,79 +1,73 @@
 #include "config.h"
-#include <Preferences.h>
 
-// ==================== CONFIGURAÇÕES AVANÇADAS CC1101 ====================
-#define CAPTURE_TIMEOUT_MS      10000  // 10 segundos escutando
-#define RSSI_THRESHOLD          -75     // dBm para considerar sinal detectado
-#define MAX_RAW_DATA          512     // Máximo de transições ( HIGH/LOW )
-#define MIN_PULSE_US          100     // Mínimo 100us para considerar válido
+// ==================== CONFIGURAÇÕES ====================
+#define CAPTURE_TIMEOUT_MS      10000
+#define RSSI_THRESHOLD          -75
+#define MAX_RAW_DATA            512
+#define MIN_PULSE_US            100
 
-// Frequências a escanear (MHz * 100 para evitar float)
 const uint32_t SCAN_FREQUENCIES[] = {31500, 43392, 86835, 91500};
 const int NUM_FREQS = 4;
 
-// Estrutura otimizada para EEPROM/Flash (NVS)
-struct SignalData {
-  uint32_t magic;           // 0xDEADBEEF para validar
-  uint32_t frequency;       // Frequência em kHz (ex: 433920)
-  uint16_t dataLength;      // Comprimento em transições
-  uint8_t modulation;       // 0=ASK/OOK, 1=FSK
-  int16_t rssi;             // RSSI no momento da captura
-  uint32_t timestamp;       // millis quando capturou
-  uint16_t timings[MAX_RAW_DATA]; // Durações em microssegundos (alternando HIGH/LOW)
-};
-
-// Namespace para variáveis do CC1101
+// Namespace
 namespace {
-  Preferences prefs;
-  SignalData currentSignal;
+  CC1101Signal currentSignal;
   bool hasSavedSignal = false;
   
-  // Estados do transceptor
-  enum CCState { CC_IDLE, CC_SCANNING, CC_CAPTURING, CC_TRANSMITTING };
+  enum CCState { CC_IDLE, CC_SCANNING, CC_CAPTURING, CC_TRANSMITTING, CC_PLAYING };
   CCState ccState = CC_IDLE;
   
-  // Variáveis de captura
   volatile uint32_t lastInterruptTime = 0;
   volatile uint16_t captureIndex = 0;
   volatile bool capturing = false;
   uint16_t tempBuffer[MAX_RAW_DATA];
   
-  // Transmissão
   bool txPlaying = false;
   int txProgress = 0;
-  uint32_t txStartTime = 0;
+  uint32_t captureStartTime = 0;
 }
 
-// ==================== FUNÇÕES EEPROM/NVS ====================
+// Exporta para outros arquivos
+CC1101Signal* getCurrentSignal() { return &currentSignal; }
 
+// Função chamada pelo menu para resetar estado
+void resetCC1101State() {
+  ccState = CC_IDLE;
+  txPlaying = false;
+  capturing = false;
+  captureIndex = 0;
+  ELECHOUSE_cc1101.setSidle();
+}
+
+// ==================== EEPROM/NVS ====================
 void initCC1101Storage() {
-  prefs.begin("cc1101sig", false); // Namespace "cc1101sig"
+  if (!prefs.begin("cc1101sig", false)) {
+    Serial.println("Erro ao abrir NVS");
+  }
   
-  // Verifica se há sinal salvo
-  if (prefs.getBytesLength("signal") == sizeof(SignalData)) {
-    prefs.getBytes("signal", &currentSignal, sizeof(SignalData));
-    if (currentSignal.magic == 0xDEADBEEF) {
+  size_t len = prefs.getBytesLength("signal");
+  if (len == sizeof(CC1101Signal)) {
+    prefs.getBytes("signal", &currentSignal, sizeof(CC1101Signal));
+    // Verifica se é válido (magic number simples: frequência != 0)
+    if (currentSignal.frequency > 0 && currentSignal.dataLength > 0) {
       hasSavedSignal = true;
     }
   }
 }
 
 void saveSignalToMemory() {
-  // Sobrescreve sempre (apenas último sinal)
-  currentSignal.magic = 0xDEADBEEF;
-  currentSignal.timestamp = millis();
-  prefs.putBytes("signal", &currentSignal, sizeof(SignalData));
+  prefs.putBytes("signal", &currentSignal, sizeof(CC1101Signal));
   hasSavedSignal = true;
 }
 
 void clearSavedSignal() {
-  currentSignal.magic = 0;
-  prefs.putBytes("signal", &currentSignal, sizeof(SignalData));
+  currentSignal.frequency = 0;
+  currentSignal.dataLength = 0;
+  prefs.putBytes("signal", &currentSignal, sizeof(CC1101Signal));
   hasSavedSignal = false;
 }
 
-// ==================== AUTO DETECÇÃO DE FREQUÊNCIA ====================
-
+// ==================== AUTO DETECÇÃO ====================
 uint32_t autoDetectFrequency() {
   int bestRssi = -1000;
   uint32_t bestFreq = 0;
@@ -83,9 +77,8 @@ uint32_t autoDetectFrequency() {
     ELECHOUSE_cc1101.setSidle();
     ELECHOUSE_cc1101.setMHZ(freq / 100.0);
     ELECHOUSE_cc1101.SetRx();
-    delay(50); // Tempo para estabilizar
+    delay(50);
     
-    // Lê RSSI várias vezes e pega o maior
     int maxRssi = -1000;
     for (int j = 0; j < 20; j++) {
       byte rssiRaw = ELECHOUSE_cc1101.getRssi();
@@ -99,7 +92,6 @@ uint32_t autoDetectFrequency() {
       bestFreq = freq;
     }
     
-    // Mostra progresso no display
     u8g2.setCursor(0, 40);
     u8g2.print("Testando ");
     u8g2.print(freq / 100.0, 2);
@@ -115,13 +107,12 @@ uint32_t autoDetectFrequency() {
   return (bestRssi > RSSI_THRESHOLD) ? bestFreq : 0;
 }
 
-// ==================== CAPTURA COM INTERRUPÇÃO ====================
-
+// ==================== CAPTURA ====================
 void IRAM_ATTR onGDO0Interrupt() {
   if (!capturing || captureIndex >= MAX_RAW_DATA) return;
   
   uint32_t now = micros();
-  if (captureIndex > 0) {
+  if (captureIndex > 0 && captureIndex < MAX_RAW_DATA) {
     tempBuffer[captureIndex - 1] = (uint16_t)(now - lastInterruptTime);
   }
   lastInterruptTime = now;
@@ -132,17 +123,15 @@ void startCapture(uint32_t frequency) {
   memset(tempBuffer, 0, sizeof(tempBuffer));
   captureIndex = 0;
   capturing = true;
+  captureStartTime = millis();
   
   ELECHOUSE_cc1101.setSidle();
   ELECHOUSE_cc1101.setMHZ(frequency / 100.0);
-  ELECHOUSE_cc1101.setModulation(0); // ASK/OOK
+  ELECHOUSE_cc1101.setModulation(0);
   ELECHOUSE_cc1101.SetRx();
-  
   delay(10);
   
-  // Configura interrupção no GDO0 (borda de subida e descida)
   attachInterrupt(digitalPinToInterrupt(CC_GDO0), onGDO0Interrupt, CHANGE);
-  
   lastInterruptTime = micros();
 }
 
@@ -150,57 +139,43 @@ void stopCapture() {
   detachInterrupt(digitalPinToInterrupt(CC_GDO0));
   capturing = false;
   
-  // Processa dados capturados
-  if (captureIndex > 10) { // Mínimo de transições válidas
+  if (captureIndex > 10) {
     currentSignal.frequency = 0; // Será definido depois
     currentSignal.dataLength = min((int)captureIndex, MAX_RAW_DATA);
     currentSignal.modulation = 0;
     
-    // Copia dados
     for (int i = 0; i < currentSignal.dataLength; i++) {
       currentSignal.timings[i] = tempBuffer[i];
     }
     
-    // Lê RSSI final
     byte rssiRaw = ELECHOUSE_cc1101.getRssi();
     currentSignal.rssi = (rssiRaw >= 128) ? (rssiRaw - 256) / 2 - 74 : rssiRaw / 2 - 74;
   }
 }
 
 // ==================== TRANSMISSÃO ====================
-
-void transmitRawSignal(bool continuous = false) {
+void transmitRawSignal() {
   if (!hasSavedSignal || currentSignal.dataLength == 0) return;
   
   ELECHOUSE_cc1101.setSidle();
   ELECHOUSE_cc1101.setMHZ(currentSignal.frequency / 100.0);
-  ELECHOUSE_cc1101.setModulation(currentSignal.modulation);
-  
-  // Para ASK/OOK, usamos controle direto do pino ou modo TX
+  ELECHOUSE_cc1101.setModulation(0);
   ELECHOUSE_cc1101.SetTx();
   
-  // Simulação de transmissão RAW (em hardware real, usar timer para precisão)
-  // Nota: A biblioteca ELECHOUSE não tem função nativa para TX RAW preciso
-  // Implementação usando digitalWrite no CC_GDO0 se possível, ou SPI burst
-  
-  for (int repeat = 0; repeat < (continuous ? 0 : 5); repeat++) { // 5 repetições ou contínuo
+  // Transmite 3 vezes (repetição padrão de controles remotos)
+  for (int rep = 0; rep < 3; rep++) {
     for (int i = 0; i < currentSignal.dataLength; i++) {
-      // Alterna estado (simplificado - em implementação real usar timer hardware)
+      // Simulação - em hardware real usar timer preciso
       delayMicroseconds(currentSignal.timings[i]);
-      
-      // Atualiza progresso visual
-      if (i % 10 == 0) {
-        txProgress = (i * 100) / currentSignal.dataLength;
-      }
+      txProgress = (i * 100) / currentSignal.dataLength;
     }
-    delay(10); // Gap entre repetições
+    delayMicroseconds(10000); // Gap entre repetições
   }
   
   ELECHOUSE_cc1101.setSidle();
 }
 
-// ==================== SETUP E LOOP PRINCIPAL ====================
-
+// ==================== SETUP E LOOP ====================
 void cc1101TransceiverSetup() {
   initCC1101Storage();
   ccState = CC_IDLE;
@@ -208,11 +183,11 @@ void cc1101TransceiverSetup() {
   
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_6x10_tr);
-  u8g2.drawStr(0, 10, "CC1101 Advanced");
+  u8g2.drawStr(0, 10, "CC1101 Capture");
   
   if (hasSavedSignal) {
     u8g2.setCursor(0, 25);
-    u8g2.print("Sinal salvo: ");
+    u8g2.print("Freq: ");
     u8g2.print(currentSignal.frequency / 1000.0, 3);
     u8g2.print(" MHz");
     u8g2.setCursor(0, 37);
@@ -222,19 +197,33 @@ void cc1101TransceiverSetup() {
     u8g2.setCursor(0, 49);
     u8g2.print("Pulsos: ");
     u8g2.print(currentSignal.dataLength);
+    u8g2.setCursor(0, 62);
+    u8g2.print("UP:Play SEL:Rec B:Menu");
   } else {
     u8g2.drawStr(0, 25, "Nenhum sinal salvo");
+    u8g2.drawStr(0, 40, "SEL: Gravar novo");
+    u8g2.drawStr(0, 55, "BACK: Voltar ao menu");
   }
   
-  u8g2.drawStr(0, 62, "SEL:Gravar UP:Play");
   u8g2.sendBuffer();
 }
 
 void cc1101TransceiverLoop() {
-  // Estado IDLE - Menu principal
+  // CORREÇÃO: Verifica BACK em TODOS os estados primeiro
+  extern bool buttonPressed(uint8_t pin);
+  if (buttonPressed(BTN_BACK)) {
+    resetCC1101State();
+    extern uint8_t current_screen;
+    current_screen = 0;
+    radio.powerDown();
+    ELECHOUSE_cc1101.setSidle();
+    delay(200);
+    return; // Sai imediatamente
+  }
+  
+  // Estado IDLE
   if (ccState == CC_IDLE) {
     if (buttonPressed(BTN_SELECT)) {
-      // Inicia modo de gravação com auto-detect
       ccState = CC_SCANNING;
       
       u8g2.clearBuffer();
@@ -251,11 +240,10 @@ void cc1101TransceiverLoop() {
         u8g2.sendBuffer();
         delay(2000);
         ccState = CC_IDLE;
-        cc1101TransceiverSetup(); // Volta para tela inicial
+        cc1101TransceiverSetup();
         return;
       }
       
-      // Frequência detectada, inicia captura
       currentSignal.frequency = detectedFreq;
       u8g2.clearBuffer();
       u8g2.setCursor(0, 10);
@@ -271,14 +259,12 @@ void cc1101TransceiverLoop() {
     }
     
     else if (buttonPressed(BTN_UP) && hasSavedSignal) {
-      // Inicia reprodução
       ccState = CC_TRANSMITTING;
       txPlaying = true;
       txProgress = 0;
     }
     
     else if (buttonPressed(BTN_DOWN) && hasSavedSignal) {
-      // Apaga sinal salvo
       clearSavedSignal();
       u8g2.clearBuffer();
       u8g2.drawStr(0, 30, "Sinal apagado!");
@@ -288,20 +274,11 @@ void cc1101TransceiverLoop() {
     }
   }
   
-  // Estado CAPTURING - Gravando sinal
+  // Estado CAPTURING
   else if (ccState == CC_CAPTURING) {
-    static uint32_t captureStartTime = 0;
-    static bool firstRun = true;
-    
-    if (firstRun) {
-      captureStartTime = millis();
-      firstRun = false;
-    }
-    
     uint32_t elapsed = millis() - captureStartTime;
     int remaining = (CAPTURE_TIMEOUT_MS - elapsed) / 1000;
     
-    // Atualiza display
     u8g2.setCursor(0, 40);
     u8g2.print("Tempo: ");
     u8g2.print(remaining);
@@ -312,13 +289,10 @@ void cc1101TransceiverLoop() {
     u8g2.print(captureIndex);
     u8g2.sendBuffer();
     
-    // Verifica timeout ou buffer cheio
     if (elapsed >= CAPTURE_TIMEOUT_MS || captureIndex >= MAX_RAW_DATA - 10) {
       stopCapture();
-      firstRun = true;
       
       if (captureIndex > 10) {
-        // Salva na memória (sobrescreve anterior)
         saveSignalToMemory();
         
         u8g2.clearBuffer();
@@ -331,13 +305,18 @@ void cc1101TransceiverLoop() {
         u8g2.print("Pulsos: ");
         u8g2.print(currentSignal.dataLength);
         u8g2.setCursor(0, 55);
-        u8g2.print("SALVO NA MEMORIA");
+        u8g2.print("SALVO! B:Menu");
         u8g2.sendBuffer();
-        delay(3000);
+        
+        // Aguarda BACK ou timeout
+        uint32_t waitStart = millis();
+        while (millis() - waitStart < 3000) {
+          if (buttonPressed(BTN_BACK)) break;
+          delay(10);
+        }
       } else {
         u8g2.clearBuffer();
         u8g2.drawStr(0, 30, "Sinal muito curto");
-        u8g2.drawStr(0, 45, "ou timeout");
         u8g2.sendBuffer();
         delay(2000);
       }
@@ -347,45 +326,39 @@ void cc1101TransceiverLoop() {
     }
   }
   
-  // Estado TRANSMITTING - Reproduzindo
+  // Estado TRANSMITTING
   else if (ccState == CC_TRANSMITTING) {
     if (txPlaying) {
-      // Tela de transmissão
       u8g2.clearBuffer();
       u8g2.setFont(u8g2_font_6x10_tr);
       
-      // Cabeçalho
       u8g2.setCursor(0, 10);
       u8g2.print("TX ");
       u8g2.print(currentSignal.frequency / 1000.0, 3);
       u8g2.print(" MHz");
       
-      // Visualização do sinal (onda simplificada)
+      // Visualização da onda
       int waveY = 30;
-      for (int x = 0; x < 128; x += 4) {
+      for (int x = 0; x < 128; x += 2) {
         int idx = (x * currentSignal.dataLength) / 128;
         if (idx < currentSignal.dataLength) {
-          int h = min(currentSignal.timings[idx] / 50, 20); // Escala
+          int h = min(currentSignal.timings[idx] / 100, 20);
           if (idx % 2 == 0) {
             u8g2.drawVLine(x, waveY - h/2, h);
           }
         }
       }
       
-      // Barra de progresso
       u8g2.drawFrame(10, 45, 108, 10);
       u8g2.drawBox(12, 47, (txProgress * 104) / 100, 6);
       
-      // Status
       u8g2.setCursor(0, 62);
-      u8g2.print("DOWN:Stop");
+      u8g2.print("Transmitindo...");
       u8g2.sendBuffer();
       
-      // Executa transmissão (não bloqueante simulado)
-      // Em implementação real, usar timer ou enviar em chunks
-      transmitRawSignal(false);
+      transmitRawSignal();
       
-      txPlaying = false; // Terminou uma sequência
+      txPlaying = false;
       
       u8g2.clearBuffer();
       u8g2.drawStr(0, 10, "Transmissao OK");
@@ -393,28 +366,17 @@ void cc1101TransceiverLoop() {
       u8g2.print("Freq: ");
       u8g2.print(currentSignal.frequency / 1000.0, 3);
       u8g2.print(" MHz");
-      u8g2.setCursor(0, 45);
-      u8g2.print("Pulsos: ");
-      u8g2.print(currentSignal.dataLength);
-      u8g2.drawStr(0, 62, "UP:Repetir B:Menu");
+      u8g2.drawStr(0, 50, "UP:Repetir B:Menu");
       u8g2.sendBuffer();
     }
     
-    // Controles após transmissão
     if (buttonPressed(BTN_UP)) {
-      txPlaying = true; // Repete
-    }
-    if (buttonPressed(BTN_DOWN)) {
-      // Para e volta para idle
-      txPlaying = false;
-      ccState = CC_IDLE;
-      cc1101TransceiverSetup();
+      txPlaying = true;
     }
   }
 }
 
-// ==================== SCANNER SIMPLES (OPCIONAL) ====================
-
+// Scanner simples (mantido para compatibilidade)
 void cc1101ScannerSetup() {
   u8g2.clearBuffer();
   u8g2.drawStr(0, 10, "CC1101 Scanner");
@@ -425,6 +387,16 @@ void cc1101ScannerSetup() {
 }
 
 void cc1101ScannerLoop() {
+  // Verifica BACK primeiro
+  extern bool buttonPressed(uint8_t pin);
+  if (buttonPressed(BTN_BACK)) {
+    ELECHOUSE_cc1101.setSidle();
+    extern uint8_t current_screen;
+    current_screen = 0;
+    delay(200);
+    return;
+  }
+  
   byte rssi = ELECHOUSE_cc1101.getRssi();
   int rssi_dbm = (rssi >= 128) ? (rssi - 256) / 2 - 74 : rssi / 2 - 74;
   
