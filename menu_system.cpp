@@ -1,22 +1,28 @@
 #include "config.h"
-#include "icons.h" // Incluindo o novo arquivo de ícones
 
 #define MENU_ITEMS 8
 
 const char* menu_names[MENU_ITEMS] = {
   "nRF24 Scanner",
   "nRF24 Jammer", 
-  "CC1101 Scan",
-  "CC1101 RX/TX",
+  "CC1101 Scanner",
+  "CC1101 Capture",  // Nova função com auto-detect
   "BLE Scan",
   "WiFi Deauth",
   "Sour Apple",
   "Configuracoes"
 };
 
+// Ponteiros para funções
 void (*menu_setup_funcs[MENU_ITEMS])();
 void (*menu_loop_funcs[MENU_ITEMS])();
 
+// Variáveis do menu
+uint8_t current_menu_item = 0;
+uint8_t current_screen = 0;
+volatile bool back_pressed = false;  // Flag global para BACK
+
+// Declarações externas
 extern void nrfScannerSetup();
 extern void nrfScannerLoop();
 extern void nrfJammerSetup();
@@ -33,6 +39,65 @@ extern void sourAppleSetup();
 extern void sourAppleLoop();
 extern void settingsSetup();
 extern void settingsLoop();
+
+// ==================== FUNÇÃO DE DEBOUNCE MELHORADA ====================
+
+bool buttonPressed(uint8_t pin) {
+  static unsigned long lastDebounceTime[4] = {0, 0, 0, 0};
+  static bool lastState[4] = {HIGH, HIGH, HIGH, HIGH};
+  static uint8_t pinMap[4] = {BTN_UP, BTN_DOWN, BTN_SELECT, BTN_BACK};
+  
+  uint8_t idx = 255;
+  for (int i = 0; i < 4; i++) {
+    if (pinMap[i] == pin) {
+      idx = i;
+      break;
+    }
+  }
+  
+  if (idx == 255) return false;
+  
+  bool reading = digitalRead(pin);
+  
+  // Detecta borda de descida (pressionamento)
+  if (reading == LOW && lastState[idx] == HIGH) {
+    if ((millis() - lastDebounceTime[idx]) > 150) { // Debounce 150ms
+      lastDebounceTime[idx] = millis();
+      lastState[idx] = reading;
+      return true;
+    }
+  }
+  
+  // Atualiza estado quando solta
+  if (reading == HIGH && lastState[idx] == LOW) {
+    lastState[idx] = reading;
+  }
+  
+  return false;
+}
+
+// ==================== CHECK ESPECIAL PARA BACK ====================
+
+void checkBackButton() {
+  if (buttonPressed(BTN_BACK)) {
+    back_pressed = true;
+    current_screen = 0;
+    
+    // Desativa todos os rádios ao voltar
+    radio.powerDown();
+    ELECHOUSE_cc1101.setSidle();
+    
+    // Reseta estados internos
+    extern void resetCC1101State();
+    resetCC1101State();
+    
+    // Redesenha menu
+    drawMenu();
+    
+    // Pequeno delay para evitar bounce
+    delay(200);
+  }
+}
 
 void initMenuSystem() {
   menu_setup_funcs[0] = nrfScannerSetup;
@@ -76,22 +141,14 @@ void drawMenu() {
     
     int y = 25 + (i * 12);
     
-    // Desenha o ícone
-    u8g2.drawXBMP(2, y - 9, 16, 16, menu_icons[idx]);
-    
     if (idx == current_menu_item) {
-      // Destaque do item selecionado
       u8g2.drawBox(0, y-9, 128, 11);
-      u8g2.setDrawColor(0); // Cor invertida para texto e ícone
-      
-      // Re-desenha o ícone com cor invertida (opcional, requer lógica complexa)
-      // Por simplicidade, o box já cria o destaque necessário
+      u8g2.setDrawColor(0);
     }
     
-    u8g2.setCursor(22, y); // Cursor deslocado para direita para acomodar ícone
+    u8g2.setCursor(5, y);
     u8g2.print(menu_names[idx]);
-    
-    u8g2.setDrawColor(1); // Volta para cor padrão
+    u8g2.setDrawColor(1);
   }
   
   // Indicador de página
@@ -102,14 +159,23 @@ void drawMenu() {
   u8g2.print("/");
   u8g2.print(total_pages);
   
+  // Hint de navegação
+  u8g2.setFont(u8g2_font_5x7_tr);
+  u8g2.setCursor(0, 63);
+  u8g2.print("SEL:Entrar B:Voltar");
+  
   u8g2.sendBuffer();
 }
 
 void handleMenu() {
+  // Verifica BACK primeiro
+  checkBackButton();
+  
   if (buttonPressed(BTN_UP)) {
     if (current_menu_item > 0) {
       current_menu_item--;
       drawMenu();
+      delay(100); // Feedback visual
     }
   }
   
@@ -117,12 +183,16 @@ void handleMenu() {
     if (current_menu_item < MENU_ITEMS - 1) {
       current_menu_item++;
       drawMenu();
+      delay(100);
     }
   }
   
   if (buttonPressed(BTN_SELECT)) {
     current_screen = 1;
+    back_pressed = false;
+    
     u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_6x10_tr);
     u8g2.drawStr(10, 30, "Carregando...");
     u8g2.sendBuffer();
     
@@ -133,16 +203,14 @@ void handleMenu() {
 }
 
 void runCurrentFunction() {
+  // VERIFICA BACK EM TODOS OS ESTADOS - CORREÇÃO PRINCIPAL
+  checkBackButton();
+  
+  // Se voltou para menu, não executa a função
+  if (current_screen == 0) return;
+  
+  // Executa função atual
   if (menu_loop_funcs[current_menu_item]) {
     menu_loop_funcs[current_menu_item]();
-  }
-  
-  // Botão BACK retorna ao menu
-  if (buttonPressed(BTN_BACK)) {
-    current_screen = 0;
-    // Desativa todos os rádios ao sair
-    radio.powerDown();
-    ELECHOUSE_cc1101.setSidle();
-    ESP.restart(); // Reinicia para limpar estados
   }
 }
