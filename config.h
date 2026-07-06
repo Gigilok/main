@@ -6,7 +6,7 @@
 #include <Wire.h>
 #include <U8g2lib.h>
 #include <RF24.h>
-#include <ELECHOUSE_CC1101_SRC_DRV.h>  // Biblioteca CC1101
+#include <ELECHOUSE_CC1101.h>
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEScan.h>
