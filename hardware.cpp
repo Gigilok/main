@@ -1,26 +1,32 @@
 #include "config.h"
 
 // Inicialização dos objetos
-U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ OLED_SCL, /* data=*/ OLED_SDA);
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8X2_R0, U8X8_PIN_NONE, OLED_SCL, OLED_SDA);
 RF24 radio(NRF_CE, NRF_CSN);
+Preferences prefs;  // Adicionado para NVS
 
-// Variáveis globais
+// Variáveis globais do sistema
 bool jamming_active = false;
 uint8_t current_menu_item = 0;
 uint8_t current_screen = 0;
-CapturedSignal saved_signals[10];
-int signal_count = 0;
+volatile bool back_pressed = false;  // Flag para comunicação entre ISRs
 
-// Interrupção de hardware para o botão Voltar
-// Garante que o clique seja detectado na hora, mesmo se o sistema estiver "preso" em um Scan
+// Variáveis do CC1101 (novo sistema)
+CC1101Signal currentSignal;
+bool hasSavedSignal = false;
+
+// Interrupção de hardware para o botão Voltar (modo emergência)
+// Usa flag ao invés de restart brusco
 void IRAM_ATTR handleBackInterrupt() {
-  if (current_screen == 1) {
-    ESP.restart(); // Reinicia o sistema e volta pro menu principal
-  }
+  back_pressed = true;
+  current_screen = 0;  // Força volta ao menu
 }
 
 void setupHardware() {
   Serial.begin(115200);
+  
+  // Inicializa NVS (memória persistente)
+  prefs.begin("nrfbox", false);
   
   // Inicializa I2C para OLED
   Wire.begin(OLED_SDA, OLED_SCL);
@@ -32,19 +38,20 @@ void setupHardware() {
   u8g2.drawStr(0, 10, "Iniciando...");
   u8g2.sendBuffer();
   
-  // Configura pinos dos botões
+  // Configura pinos dos botões com PULLUP
   pinMode(BTN_UP, INPUT_PULLUP);
   pinMode(BTN_DOWN, INPUT_PULLUP);
   pinMode(BTN_SELECT, INPUT_PULLUP);
   pinMode(BTN_BACK, INPUT_PULLUP);
   
-  // Anexa a interrupção ao pino do botão Voltar
+  // Anexa interrupção ao pino BACK (modo emergência/fallback)
+  // FALLING porque com PULLUP, pressionar = LOW
   attachInterrupt(digitalPinToInterrupt(BTN_BACK), handleBackInterrupt, FALLING);
   
   // Inicializa SPI
   SPI.begin(NRF_SCK, NRF_MISO, NRF_MOSI);
   
-  // Inicializa nRF24
+  // Inicializa nRF24 (1 módulo apenas)
   if (!radio.begin()) {
     Serial.println("Falha nRF24!");
     u8g2.drawStr(0, 25, "ERRO: nRF24L01");
@@ -65,10 +72,10 @@ void setupHardware() {
   if (ELECHOUSE_cc1101.getCC1101()) {
     ELECHOUSE_cc1101.Init();
     ELECHOUSE_cc1101.setGDO0(CC_GDO0);
-    ELECHOUSE_cc1101.setGDO(CC_GDO0, CC_GDO2);
-    ELECHOUSE_cc1101.setCCMode(1); // Modo alta taxa
-    ELECHOUSE_cc1101.setModulation(0); // ASK/OOK
-    ELECHOUSE_cc1101.setMHZ(433.92); // Frequência padrão
+    ELECHOUSE_cc1101.setGDO(CC_GDO0, CC_GDO2);  // Configura ambos GDOs
+    ELECHOUSE_cc1101.setCCMode(1);              // Modo alta taxa
+    ELECHOUSE_cc1101.setModulation(0);          // ASK/OOK
+    ELECHOUSE_cc1101.setMHZ(433.92);            // Frequência padrão
     u8g2.drawStr(0, 35, "CC1101: OK");
   } else {
     u8g2.drawStr(0, 35, "ERRO: CC1101");
@@ -80,16 +87,25 @@ void setupHardware() {
   radio.powerDown();
   ELECHOUSE_cc1101.setSidle();
   
+  // Carrega sinal salvo (se existir)
+  size_t len = prefs.getBytesLength("signal");
+  if (len == sizeof(CC1101Signal)) {
+    prefs.getBytes("signal", &currentSignal, sizeof(CC1101Signal));
+    if (currentSignal.frequency > 0 && currentSignal.dataLength > 0) {
+      hasSavedSignal = true;
+    }
+  }
+  
   u8g2.clearBuffer();
 }
 
-// Debounce para botões corrigido
+// Debounce otimizado para botões
 bool buttonPressed(uint8_t pin) {
   static unsigned long lastDebounceTime[4] = {0, 0, 0, 0};
   static bool lastState[4] = {HIGH, HIGH, HIGH, HIGH};
   static uint8_t pinMap[4] = {BTN_UP, BTN_DOWN, BTN_SELECT, BTN_BACK};
   
-  uint8_t idx = 0;
+  uint8_t idx = 255;
   for (int i = 0; i < 4; i++) {
     if (pinMap[i] == pin) {
       idx = i;
@@ -97,19 +113,45 @@ bool buttonPressed(uint8_t pin) {
     }
   }
   
-  bool reading = digitalRead(pin);
-  bool pressed = false;
+  if (idx == 255) return false;
   
-  // Se o estado mudou e já passou o tempo de debounce (150ms)
-  if (reading != lastState[idx] && (millis() - lastDebounceTime[idx]) > 150) {
-    lastDebounceTime[idx] = millis(); // Atualiza o cronômetro
-    lastState[idx] = reading;         // Salva o novo estado
-    
-    // Como os botões usam INPUT_PULLUP, a leitura de um clique é LOW
-    if (reading == LOW) {
-      pressed = true;
+  bool reading = digitalRead(pin);
+  
+  // Detecta borda de descida (LOW com PULLUP = pressionado)
+  if (reading == LOW && lastState[idx] == HIGH) {
+    if ((millis() - lastDebounceTime[idx]) > 150) {  // Debounce 150ms
+      lastDebounceTime[idx] = millis();
+      lastState[idx] = reading;
+      
+      // Se for o botão BACK, desativa interrupção temporariamente para evitar duplo trigger
+      if (pin == BTN_BACK) {
+        detachInterrupt(digitalPinToInterrupt(BTN_BACK));
+        delay(50);
+        attachInterrupt(digitalPinToInterrupt(BTN_BACK), handleBackInterrupt, FALLING);
+      }
+      
+      return true;
     }
   }
   
-  return pressed;
+  // Atualiza estado quando solta
+  if (reading == HIGH && lastState[idx] == LOW) {
+    lastState[idx] = reading;
+  }
+  
+  return false;
+}
+
+// Função para verificar flag de interrupção (chamar no loop principal)
+void checkBackInterruptFlag() {
+  if (back_pressed) {
+    back_pressed = false;
+    current_screen = 0;
+    radio.powerDown();
+    ELECHOUSE_cc1101.setSidle();
+    
+    // Redesenha menu se necessário
+    extern void drawMenu();
+    drawMenu();
+  }
 }
