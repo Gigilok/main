@@ -45,10 +45,11 @@
 // Estrutura para sinais CC1101
 struct CC1101Signal {
   uint32_t frequency;       // em kHz (ex: 433920)
-  uint16_t dataLength;
-  int16_t rssi;
-  uint32_t timestamp;
-  uint16_t timings[512];    // RAW timings em us
+  uint16_t dataLength;      // Número de transições
+  int16_t rssi;             // RSSI no momento da captura
+  uint32_t timestamp;       // millis() quando capturou
+  uint8_t modulation;       // 0=ASK/OOK, 1=FSK, 2=GFSK
+  uint16_t timings[512];    // Timings RAW em microssegundos
 };
 
 // Instâncias Globais
