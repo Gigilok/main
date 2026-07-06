@@ -67,4 +67,7 @@ extern volatile bool back_pressed;  // Flag para botão back
 extern CC1101Signal currentSignal;
 extern bool hasSavedSignal;
 
+// ==================== DECLARAÇÃO DE FUNÇÕES ====================
+bool buttonPressed(uint8_t pin); // <--- CORREÇÃO ADICIONADA AQUI
+
 #endif
