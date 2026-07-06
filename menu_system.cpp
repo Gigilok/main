@@ -1,5 +1,9 @@
 #include "config.h"
 
+
+// Forward declarations
+void drawMenu(void);
+
 #define MENU_ITEMS 8
 
 const char* menu_names[MENU_ITEMS] = {
