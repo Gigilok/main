@@ -1,3 +1,4 @@
+#include <ELECHOUSE_CC1101_SRC_DRV.h> // Force o include aqui primeiro
 #include "config.h"
 
 // Declarações externas das funções do menu
