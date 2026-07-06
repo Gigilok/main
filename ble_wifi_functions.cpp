@@ -34,7 +34,8 @@ void bleScanSetup() {
 
 void bleScanLoop() {
   if (bleScanning) {
-    pResults = (BLEScanResults*)&pBLEScan->getResults();
+    static BLEScanResults scanRes = pBLEScan->getResults();
+    pResults = &scanRes;
     bleDeviceCount = pResults->getCount();
     
     u8g2.clearBuffer();
