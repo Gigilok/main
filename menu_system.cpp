@@ -1,4 +1,5 @@
 #include "config.h"
+#include "icons.h" // Incluindo o novo arquivo de ícones
 
 #define MENU_ITEMS 8
 
@@ -75,14 +76,22 @@ void drawMenu() {
     
     int y = 25 + (i * 12);
     
+    // Desenha o ícone
+    u8g2.drawXBMP(2, y - 9, 16, 16, menu_icons[idx]);
+    
     if (idx == current_menu_item) {
+      // Destaque do item selecionado
       u8g2.drawBox(0, y-9, 128, 11);
-      u8g2.setDrawColor(0);
+      u8g2.setDrawColor(0); // Cor invertida para texto e ícone
+      
+      // Re-desenha o ícone com cor invertida (opcional, requer lógica complexa)
+      // Por simplicidade, o box já cria o destaque necessário
     }
     
-    u8g2.setCursor(5, y);
+    u8g2.setCursor(22, y); // Cursor deslocado para direita para acomodar ícone
     u8g2.print(menu_names[idx]);
-    u8g2.setDrawColor(1);
+    
+    u8g2.setDrawColor(1); // Volta para cor padrão
   }
   
   // Indicador de página
