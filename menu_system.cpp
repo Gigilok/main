@@ -39,41 +39,6 @@ extern void sourAppleLoop();
 extern void settingsSetup();
 extern void settingsLoop();
 
-// ==================== FUNÇÃO DE DEBOUNCE MELHORADA ====================
-
-bool buttonPressed(uint8_t pin) {
-  static unsigned long lastDebounceTime[4] = {0, 0, 0, 0};
-  static bool lastState[4] = {HIGH, HIGH, HIGH, HIGH};
-  static uint8_t pinMap[4] = {BTN_UP, BTN_DOWN, BTN_SELECT, BTN_BACK};
-  
-  uint8_t idx = 255;
-  for (int i = 0; i < 4; i++) {
-    if (pinMap[i] == pin) {
-      idx = i;
-      break;
-    }
-  }
-  
-  if (idx == 255) return false;
-  
-  bool reading = digitalRead(pin);
-  
-  // Detecta borda de descida (pressionamento)
-  if (reading == LOW && lastState[idx] == HIGH) {
-    if ((millis() - lastDebounceTime[idx]) > 150) { // Debounce 150ms
-      lastDebounceTime[idx] = millis();
-      lastState[idx] = reading;
-      return true;
-    }
-  }
-  
-  // Atualiza estado quando solta
-  if (reading == HIGH && lastState[idx] == LOW) {
-    lastState[idx] = reading;
-  }
-  
-  return false;
-}
 
 // ==================== CHECK ESPECIAL PARA BACK ====================
 
