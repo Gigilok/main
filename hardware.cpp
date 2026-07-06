@@ -11,6 +11,14 @@ uint8_t current_screen = 0;
 CapturedSignal saved_signals[10];
 int signal_count = 0;
 
+// Interrupção de hardware para o botão Voltar
+// Garante que o clique seja detectado na hora, mesmo se o sistema estiver "preso" em um Scan
+void IRAM_ATTR handleBackInterrupt() {
+  if (current_screen == 1) {
+    ESP.restart(); // Reinicia o sistema e volta pro menu principal
+  }
+}
+
 void setupHardware() {
   Serial.begin(115200);
   
@@ -29,6 +37,9 @@ void setupHardware() {
   pinMode(BTN_DOWN, INPUT_PULLUP);
   pinMode(BTN_SELECT, INPUT_PULLUP);
   pinMode(BTN_BACK, INPUT_PULLUP);
+  
+  // Anexa a interrupção ao pino do botão Voltar
+  attachInterrupt(digitalPinToInterrupt(BTN_BACK), handleBackInterrupt, FALLING);
   
   // Inicializa SPI
   SPI.begin(NRF_SCK, NRF_MISO, NRF_MOSI);
