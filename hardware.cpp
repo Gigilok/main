@@ -54,7 +54,7 @@ void setupHardware() {
   if (ELECHOUSE_cc1101.getCC1101()) {
     ELECHOUSE_cc1101.Init();
     ELECHOUSE_cc1101.setGDO0(CC_GDO0);
-    ELECHOUSE_cc1101.setGDO2(CC_GDO2);
+    ELECHOUSE_cc1101.setGDO(CC_GDO0, CC_GDO2);
     ELECHOUSE_cc1101.setCCMode(1); // Modo alta taxa
     ELECHOUSE_cc1101.setModulation(0); // ASK/OOK
     ELECHOUSE_cc1101.setMHZ(433.92); // Frequência padrão
