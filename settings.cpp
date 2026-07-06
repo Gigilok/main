@@ -31,7 +31,6 @@ void settingsLoop() {
   
   if (buttonPressed(BTN_SELECT)) {
     prefs.putUChar("brightness", brightness);
-    prefs.commit();
     
     u8g2.clearBuffer();
     u8g2.drawStr(0, 30, "Salvo!");
