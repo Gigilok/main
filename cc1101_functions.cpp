@@ -9,10 +9,10 @@
 const uint32_t SCAN_FREQUENCIES[] = {31500, 43392, 86835, 91500};
 const int NUM_FREQS = 4;
 
-// Namespace
+// ==================== VARIÁVEIS LOCAIS (NAMESPACE) ====================
 namespace {
-  CC1101Signal currentSignal;
-  bool hasSavedSignal = false;
+  // REMOVIDO: CC1101Signal currentSignal; (já está no config.h como global)
+  // REMOVIDO: bool hasSavedSignal = false; (já está no config.h como global)
   
   enum CCState { CC_IDLE, CC_SCANNING, CC_CAPTURING, CC_TRANSMITTING, CC_PLAYING };
   CCState ccState = CC_IDLE;
@@ -27,8 +27,11 @@ namespace {
   uint32_t captureStartTime = 0;
 }
 
-// Exporta para outros arquivos
-CC1101Signal* getCurrentSignal() { return &currentSignal; }
+// ==================== FUNÇÕES DE ACESSO ====================
+// Função para permitir acesso externo se necessário
+CC1101Signal* getCurrentSignal() { 
+  return &currentSignal;  // Agora referencia a global do config.h
+}
 
 // Função chamada pelo menu para resetar estado
 void resetCC1101State() {
@@ -41,16 +44,18 @@ void resetCC1101State() {
 
 // ==================== EEPROM/NVS ====================
 void initCC1101Storage() {
+  // prefs já está declarado no config.h como extern
   if (!prefs.begin("cc1101sig", false)) {
-    Serial.println("Erro ao abrir NVS");
+    Serial.println("NVS: Erro ao abrir namespace");
   }
   
   size_t len = prefs.getBytesLength("signal");
   if (len == sizeof(CC1101Signal)) {
     prefs.getBytes("signal", &currentSignal, sizeof(CC1101Signal));
-    // Verifica se é válido (magic number simples: frequência != 0)
+    // Verifica se é válido (frequência != 0)
     if (currentSignal.frequency > 0 && currentSignal.dataLength > 0) {
       hasSavedSignal = true;
+      Serial.println("CC1101: Sinal anterior carregado");
     }
   }
 }
@@ -58,6 +63,7 @@ void initCC1101Storage() {
 void saveSignalToMemory() {
   prefs.putBytes("signal", &currentSignal, sizeof(CC1101Signal));
   hasSavedSignal = true;
+  Serial.println("CC1101: Sinal salvo na memória");
 }
 
 void clearSavedSignal() {
@@ -65,9 +71,10 @@ void clearSavedSignal() {
   currentSignal.dataLength = 0;
   prefs.putBytes("signal", &currentSignal, sizeof(CC1101Signal));
   hasSavedSignal = false;
+  Serial.println("CC1101: Sinal apagado");
 }
 
-// ==================== AUTO DETECÇÃO ====================
+// ==================== AUTO DETECÇÃO DE FREQUÊNCIA ====================
 uint32_t autoDetectFrequency() {
   int bestRssi = -1000;
   uint32_t bestFreq = 0;
@@ -107,7 +114,7 @@ uint32_t autoDetectFrequency() {
   return (bestRssi > RSSI_THRESHOLD) ? bestFreq : 0;
 }
 
-// ==================== CAPTURA ====================
+// ==================== CAPTURA COM INTERRUPÇÃO ====================
 void IRAM_ATTR onGDO0Interrupt() {
   if (!capturing || captureIndex >= MAX_RAW_DATA) return;
   
@@ -162,10 +169,9 @@ void transmitRawSignal() {
   ELECHOUSE_cc1101.setModulation(0);
   ELECHOUSE_cc1101.SetTx();
   
-  // Transmite 3 vezes (repetição padrão de controles remotos)
+  // Transmite 3 vezes (padrão de controles remotos)
   for (int rep = 0; rep < 3; rep++) {
     for (int i = 0; i < currentSignal.dataLength; i++) {
-      // Simulação - em hardware real usar timer preciso
       delayMicroseconds(currentSignal.timings[i]);
       txProgress = (i * 100) / currentSignal.dataLength;
     }
@@ -175,7 +181,7 @@ void transmitRawSignal() {
   ELECHOUSE_cc1101.setSidle();
 }
 
-// ==================== SETUP E LOOP ====================
+// ==================== SETUP E LOOP PRINCIPAL ====================
 void cc1101TransceiverSetup() {
   initCC1101Storage();
   ccState = CC_IDLE;
@@ -209,7 +215,7 @@ void cc1101TransceiverSetup() {
 }
 
 void cc1101TransceiverLoop() {
-  // CORREÇÃO: Verifica BACK em TODOS os estados primeiro
+  // Verifica BACK primeiro (usando a função do main.ino ou local)
   extern bool buttonPressed(uint8_t pin);
   if (buttonPressed(BTN_BACK)) {
     resetCC1101State();
@@ -218,7 +224,7 @@ void cc1101TransceiverLoop() {
     radio.powerDown();
     ELECHOUSE_cc1101.setSidle();
     delay(200);
-    return; // Sai imediatamente
+    return;
   }
   
   // Estado IDLE
@@ -308,7 +314,6 @@ void cc1101TransceiverLoop() {
         u8g2.print("SALVO! B:Menu");
         u8g2.sendBuffer();
         
-        // Aguarda BACK ou timeout
         uint32_t waitStart = millis();
         while (millis() - waitStart < 3000) {
           if (buttonPressed(BTN_BACK)) break;
@@ -337,7 +342,6 @@ void cc1101TransceiverLoop() {
       u8g2.print(currentSignal.frequency / 1000.0, 3);
       u8g2.print(" MHz");
       
-      // Visualização da onda
       int waveY = 30;
       for (int x = 0; x < 128; x += 2) {
         int idx = (x * currentSignal.dataLength) / 128;
@@ -376,7 +380,7 @@ void cc1101TransceiverLoop() {
   }
 }
 
-// Scanner simples (mantido para compatibilidade)
+// ==================== SCANNER SIMPLES ====================
 void cc1101ScannerSetup() {
   u8g2.clearBuffer();
   u8g2.drawStr(0, 10, "CC1101 Scanner");
@@ -387,7 +391,6 @@ void cc1101ScannerSetup() {
 }
 
 void cc1101ScannerLoop() {
-  // Verifica BACK primeiro
   extern bool buttonPressed(uint8_t pin);
   if (buttonPressed(BTN_BACK)) {
     ELECHOUSE_cc1101.setSidle();
