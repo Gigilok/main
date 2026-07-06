@@ -1,5 +1,8 @@
 #include "config.h"
 
+bool buttonPressed(uint8_t pin);
+
+
 // ==================== CC1101 SCANNER (Sub-GHz) ====================
 namespace {
   float frequencies[] = {315.0, 433.92, 868.35, 915.0};
