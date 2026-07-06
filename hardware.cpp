@@ -1,7 +1,7 @@
 #include "config.h"
 
 // Inicialização dos objetos
-U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8X2_R0, U8X8_PIN_NONE, OLED_SCL, OLED_SDA);
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE, OLED_SCL, OLED_SDA);
 RF24 radio(NRF_CE, NRF_CSN);
 Preferences prefs;  // Adicionado para NVS
 
