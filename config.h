@@ -65,4 +65,6 @@ struct CapturedSignal {
 extern CapturedSignal saved_signals[10];
 extern int signal_count;
 
+bool buttonPressed(uint8_t pin);
+
 #endif
