@@ -19,11 +19,14 @@ jobs:
       - name: Organizar Binários
         run: |
           mkdir -p binarios_para_flash
-          # Copia os arquivos gerados pelo PlatformIO para uma pasta separada
+          
+          # Copia os binários gerados pelo build
           cp .pio/build/esp32dev/firmware.bin binarios_para_flash/
           cp .pio/build/esp32dev/bootloader.bin binarios_para_flash/
           cp .pio/build/esp32dev/partitions.bin binarios_para_flash/
-          cp .pio/build/esp32dev/boot_app0.bin binarios_para_flash/
+          
+          # Procura e copia o boot_app0.bin de dentro dos pacotes do PlatformIO
+          find ~/.platformio/packages/ -name "boot_app0.bin" -exec cp {} binarios_para_flash/ \;
 
       - name: Upload dos Artefatos
         uses: actions/upload-artifact@v4
