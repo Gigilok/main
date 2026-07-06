@@ -21,11 +21,6 @@ const char* menu_names[MENU_ITEMS] = {
 void (*menu_setup_funcs[MENU_ITEMS])();
 void (*menu_loop_funcs[MENU_ITEMS])();
 
-// Variáveis do menu
-uint8_t current_menu_item = 0;
-uint8_t current_screen = 0;
-volatile bool back_pressed = false;  // Flag global para BACK
-
 // Declarações externas
 extern void nrfScannerSetup();
 extern void nrfScannerLoop();
