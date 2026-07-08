@@ -6,6 +6,7 @@
 #include <Wire.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <esp_wifi.h>
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
@@ -16,8 +17,8 @@
 #include <ELECHOUSE_CC1101_SRC_DRV.h>
 #include <string>
 
-#define FIRMWARE_VERSION "MadCat OS v1.0"
-#define FIRMWARE_SHORT   "v1.0"
+#define FIRMWARE_VERSION "MadCat OS v2.0"
+#define FIRMWARE_SHORT   "v2.0"
 
 #define OLED_SDA 21
 #define OLED_SCL 22
@@ -65,6 +66,21 @@ struct RCSwitchProtocol {
   bool inverted;
 };
 
+struct DecodedSignal {
+  uint32_t code;
+  int protocolIndex;
+  int bits;
+  bool valid;
+};
+
+struct SubGHzEntry {
+  const char* name;
+  float frequency;
+  int protocolIndex;
+  uint32_t code;
+  int bits;
+};
+
 extern U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2;
 extern RF24 radio;
 extern Preferences prefs;
@@ -85,13 +101,21 @@ namespace cc1101 {
   extern bool rolljamHasCode2;
   extern int rolljamStep;
   extern unsigned long rolljamTimer;
+  extern int rolljamProtocol1;
+  extern int rolljamProtocol2;
+  extern int rolljamBits1;
+  extern int rolljamBits2;
   extern bool rollingPwnActive;
   extern int rollingPwnStep;
   extern int rollingPwnCounter;
   extern unsigned long rollingPwnTimer;
   extern uint32_t capturedCodes[10];
   extern int capturedCodeCount;
-  enum BFMode { BF_MODE_COMMON, BF_MODE_DEBRUIJN, BF_MODE_FULL, BF_MODE_ROLLJAM, BF_MODE_ROLLINGPWN };
+  extern int capturedProtocols[10];
+  extern int capturedBits[10];
+  extern int32_t rollingPwnPattern;
+  extern int rollingPwnPatternType;
+  enum BFMode { BF_MODE_COMMON, BF_MODE_DEBRUIJN, BF_MODE_FULL, BF_MODE_ROLLJAM, BF_MODE_ROLLINGPWN, BF_MODE_SMART };
   extern BFMode bfMode;
   enum BFState { BF_IDLE, BF_RUNNING, BF_PAUSED };
   extern BFState bfState;
@@ -110,6 +134,8 @@ extern const RCSwitchProtocol protocols[];
 extern const int NUM_PROTOCOLS;
 extern const uint32_t COMMON_CODES[];
 extern const int NUM_COMMON_CODES;
+extern const SubGHzEntry subGHzDatabase[];
+extern const int SUBGHZ_DB_COUNT;
 
 enum CCState { CC_IDLE, CC_SCANNING, CC_CAPTURING, CC_TRANSMITTING };
 
@@ -146,6 +172,8 @@ int getCaptureIndex();
 uint32_t getCaptureStartTime();
 uint32_t getDetectedFrequency();
 void setDetectedFrequency(uint32_t freq);
+DecodedSignal decodeCapturedSignal();
+void analyzeProtocol();
 void rollJamAttackStep();
 void rollingPwnAttackStep();
 void cc1101BruteForceSetup();
@@ -160,6 +188,8 @@ void bleScanSetup();
 void bleScanLoop();
 void wifiDeauthSetup();
 void wifiDeauthLoop();
+void wifiDeauthAttackSetup();
+void wifiDeauthAttackLoop();
 void sourAppleSetup();
 void sourAppleLoop();
 void settingsSetup();
@@ -168,6 +198,8 @@ void signalManagerSetup();
 void signalManagerLoop();
 void infoSetup();
 void infoLoop();
+void subGHzDBSetup();
+void subGHzDBLoop();
 
 #include "icons.h"
 
