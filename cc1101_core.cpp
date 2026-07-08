@@ -68,12 +68,20 @@ namespace cc1101 {
   bool rolljamHasCode2 = false;
   int rolljamStep = 0;
   unsigned long rolljamTimer = 0;
+  int rolljamProtocol1 = -1;
+  int rolljamProtocol2 = -1;
+  int rolljamBits1 = 24;
+  int rolljamBits2 = 24;
   bool rollingPwnActive = false;
   int rollingPwnStep = 0;
   int rollingPwnCounter = 0;
   unsigned long rollingPwnTimer = 0;
   uint32_t capturedCodes[10];
   int capturedCodeCount = 0;
+  int capturedProtocols[10];
+  int capturedBits[10];
+  int32_t rollingPwnPattern = 0;
+  int rollingPwnPatternType = 0;
   BFMode bfMode = BF_MODE_COMMON;
   BFState bfState = BF_IDLE;
   int bfFreqIndex = 0;
@@ -249,6 +257,72 @@ void jamChannel(uint32_t freqKHz) {
     delayMicroseconds(100);
   }
   digitalWrite(CC_GDO0, LOW);
+}
+
+DecodedSignal decodeCapturedSignal() {
+  DecodedSignal result = {0, -1, 0, false};
+  
+  if (currentSignal.dataLength < 20) return result;
+  
+  for (int p = 0; p < NUM_PROTOCOLS; p++) {
+    const RCSwitchProtocol& proto = protocols[p];
+    int pulseLength = proto.pulseLength;
+    int tolerance = pulseLength * 0.35;
+    
+    for (int i = 0; i < currentSignal.dataLength - 4; i++) {
+      int highTime = currentSignal.timings[i];
+      int lowTime = currentSignal.timings[i+1];
+      
+      bool highMatch = abs(highTime - pulseLength * proto.syncFactor[0]) <= max(tolerance, 50);
+      bool lowMatch = abs(lowTime - pulseLength * proto.syncFactor[1]) <= max(tolerance, 100);
+      
+      if (highMatch && lowMatch) {
+        uint32_t code = 0;
+        int bits = 0;
+        int pos = i + 2;
+        
+        while (pos + 1 < currentSignal.dataLength && bits < 32) {
+          int bitHigh = currentSignal.timings[pos];
+          int bitLow = currentSignal.timings[pos + 1];
+          
+          bool zeroHigh = abs(bitHigh - pulseLength * proto.zero[0]) <= max(tolerance, 50);
+          bool zeroLow = abs(bitLow - pulseLength * proto.zero[1]) <= max(tolerance, 50);
+          bool oneHigh = abs(bitHigh - pulseLength * proto.one[0]) <= max(tolerance, 50);
+          bool oneLow = abs(bitLow - pulseLength * proto.one[1]) <= max(tolerance, 50);
+          
+          if (zeroHigh && zeroLow) {
+            code = (code << 1) | 0;
+            bits++;
+            pos += 2;
+          } else if (oneHigh && oneLow) {
+            code = (code << 1) | 1;
+            bits++;
+            pos += 2;
+          } else {
+            break;
+          }
+        }
+        
+        if (bits >= 12 && bits <= 32) {
+          result.code = code;
+          result.protocolIndex = p;
+          result.bits = bits;
+          result.valid = true;
+          return result;
+        }
+      }
+    }
+  }
+  
+  return result;
+}
+
+void analyzeProtocol() {
+  if (!hasSavedSignal || currentSignal.dataLength < 10) return;
+  DecodedSignal decoded = decodeCapturedSignal();
+  if (decoded.valid) {
+    currentSignal.modulation = decoded.protocolIndex;
+  }
 }
 
 int getCaptureIndex() { return (int)captureIndex; }
