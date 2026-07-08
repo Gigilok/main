@@ -17,6 +17,7 @@
 #include <U8g2lib.h>
 #include <RF24.h>
 #include <ELECHOUSE_CC1101_SRC_DRV.h>
+#include <string>
 
 // ============================================
 // VERSAO DO FIRMWARE
