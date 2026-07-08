@@ -14,7 +14,8 @@
 #include <WiFi.h>
 #include <Preferences.h>
 
-#define FIRMWARE_VERSION    "v2.2"
+#define FIRMWARE_VERSION    "v2.3"
+#define FIRMWARE_DATE       "2026-07-08"
 
 #define OLED_SDA            21
 #define OLED_SCL            22
@@ -36,6 +37,7 @@
 #define MAX_RAW_DATA        512
 #define CAPTURE_TIMEOUT_MS  10000
 #define RSSI_THRESHOLD      -75
+#define MIN_PULSE_US        100
 
 struct CC1101Signal {
   uint32_t frequency;
@@ -54,6 +56,15 @@ struct SavedSignal {
   bool active;
 };
 
+struct RCSwitchProtocol {
+  const char* name;
+  uint16_t pulseLength;
+  uint8_t syncFactor[2];
+  uint8_t zero[2];
+  uint8_t one[2];
+  bool inverted;
+};
+
 extern U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2;
 extern RF24 radio;
 extern Preferences prefs;
@@ -62,6 +73,7 @@ extern bool jamming_active;
 extern uint8_t current_menu_item;
 extern volatile uint8_t current_screen;
 extern volatile bool back_pressed;
+
 extern CC1101Signal currentSignal;
 extern bool hasSavedSignal;
 extern SavedSignal savedSignals[MAX_SAVED_SIGNALS];
@@ -75,6 +87,9 @@ void handleMenu(void);
 void runCurrentFunction(void);
 void initMenuSystem(void);
 void resetCC1101State(void);
+void loadAllSignals(void);
+void saveSignalToSlot(int slot, const CC1101Signal& sig);
+void clearSignalSlot(int slot);
 
 void nrfScannerSetup(void);
 void nrfScannerLoop(void);
