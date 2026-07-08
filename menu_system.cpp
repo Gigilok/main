@@ -1,18 +1,18 @@
 #include "config.h"
+#include "icons.h"
 
-
-// Forward declarations
-void drawMenu(void);
-
-#define MENU_ITEMS 8
+// ==================== CONFIGURAÇÃO DO MENU ====================
+#define MENU_ITEMS 10
 
 const char* menu_names[MENU_ITEMS] = {
   "nRF24 Scanner",
-  "nRF24 Jammer", 
+  "nRF24 Jammer",
   "CC1101 Scanner",
-  "CC1101 Capture",  // Nova função com auto-detect
+  "CC1101 Capture",
+  "CC1101 BruteForce",
+  "CC1101 FreqSweep",
   "BLE Scan",
-  "WiFi Deauth",
+  "WiFi Scan",
   "Sour Apple",
   "Configuracoes"
 };
@@ -21,44 +21,22 @@ const char* menu_names[MENU_ITEMS] = {
 void (*menu_setup_funcs[MENU_ITEMS])();
 void (*menu_loop_funcs[MENU_ITEMS])();
 
-// Declarações externas
-extern void nrfScannerSetup();
-extern void nrfScannerLoop();
-extern void nrfJammerSetup();
-extern void nrfJammerLoop();
-extern void cc1101ScannerSetup();
-extern void cc1101ScannerLoop();
-extern void cc1101TransceiverSetup();
-extern void cc1101TransceiverLoop();
-extern void bleScanSetup();
-extern void bleScanLoop();
-extern void wifiDeauthSetup();
-extern void wifiDeauthLoop();
-extern void sourAppleSetup();
-extern void sourAppleLoop();
-extern void settingsSetup();
-extern void settingsLoop();
-
-
-// ==================== CHECK ESPECIAL PARA BACK ====================
-
+// ==================== CHECK BACK BUTTON ====================
 void checkBackButton() {
   if (buttonPressed(BTN_BACK)) {
     back_pressed = true;
     current_screen = 0;
     
-    // Desativa todos os rádios ao voltar
+    // Desativa todos os rádios
     radio.powerDown();
     ELECHOUSE_cc1101.setSidle();
     
     // Reseta estados internos
-    extern void resetCC1101State();
     resetCC1101State();
     
     // Redesenha menu
     drawMenu();
     
-    // Pequeno delay para evitar bounce
     delay(200);
   }
 }
@@ -76,25 +54,34 @@ void initMenuSystem() {
   menu_setup_funcs[3] = cc1101TransceiverSetup;
   menu_loop_funcs[3] = cc1101TransceiverLoop;
   
-  menu_setup_funcs[4] = bleScanSetup;
-  menu_loop_funcs[4] = bleScanLoop;
+  menu_setup_funcs[4] = cc1101BruteForceSetup;
+  menu_loop_funcs[4] = cc1101BruteForceLoop;
   
-  menu_setup_funcs[5] = wifiDeauthSetup;
-  menu_loop_funcs[5] = wifiDeauthLoop;
+  menu_setup_funcs[5] = cc1101FreqSweepSetup;
+  menu_loop_funcs[5] = cc1101FreqSweepLoop;
   
-  menu_setup_funcs[6] = sourAppleSetup;
-  menu_loop_funcs[6] = sourAppleLoop;
+  menu_setup_funcs[6] = bleScanSetup;
+  menu_loop_funcs[6] = bleScanLoop;
   
-  menu_setup_funcs[7] = settingsSetup;
-  menu_loop_funcs[7] = settingsLoop;
+  menu_setup_funcs[7] = wifiDeauthSetup;
+  menu_loop_funcs[7] = wifiDeauthLoop;
+  
+  menu_setup_funcs[8] = sourAppleSetup;
+  menu_loop_funcs[8] = sourAppleLoop;
+  
+  menu_setup_funcs[9] = settingsSetup;
+  menu_loop_funcs[9] = settingsLoop;
 }
 
 void drawMenu() {
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_6x10_tr);
   
-  // Título
-  u8g2.drawStr(30, 10, "nRF-BOX Pro");
+  // Título com versão
+  u8g2.drawStr(25, 10, "nRF-BOX Pro");
+  u8g2.setFont(u8g2_font_5x7_tr);
+  u8g2.setCursor(95, 10);
+  u8g2.print(FIRMWARE_VERSION);
   u8g2.drawHLine(0, 12, 128);
   
   // Itens do menu (mostra 4 por vez)
@@ -105,12 +92,17 @@ void drawMenu() {
     
     int y = 25 + (i * 12);
     
+    // Desenha ícone se disponível e idx < 8
+    if (idx < 8) {
+      u8g2.drawXBMP(2, y - 8, 16, 16, menu_icons[idx]);
+    }
+    
     if (idx == current_menu_item) {
-      u8g2.drawBox(0, y-9, 128, 11);
+      u8g2.drawBox(20, y - 9, 108, 11);
       u8g2.setDrawColor(0);
     }
     
-    u8g2.setCursor(5, y);
+    u8g2.setCursor(23, y);
     u8g2.print(menu_names[idx]);
     u8g2.setDrawColor(1);
   }
@@ -118,7 +110,7 @@ void drawMenu() {
   // Indicador de página
   int total_pages = (MENU_ITEMS + 3) / 4;
   int current_page = current_menu_item / 4;
-  u8g2.setCursor(110, 60);
+  u8g2.setCursor(105, 62);
   u8g2.print(current_page + 1);
   u8g2.print("/");
   u8g2.print(total_pages);
@@ -139,7 +131,7 @@ void handleMenu() {
     if (current_menu_item > 0) {
       current_menu_item--;
       drawMenu();
-      delay(100); // Feedback visual
+      delay(80);
     }
   }
   
@@ -147,7 +139,7 @@ void handleMenu() {
     if (current_menu_item < MENU_ITEMS - 1) {
       current_menu_item++;
       drawMenu();
-      delay(100);
+      delay(80);
     }
   }
   
@@ -167,10 +159,10 @@ void handleMenu() {
 }
 
 void runCurrentFunction() {
-  // VERIFICA BACK EM TODOS OS ESTADOS - CORREÇÃO PRINCIPAL
+  // VERIFICA BACK EM TODOS OS ESTADOS
   checkBackButton();
   
-  // Se voltou para menu, não executa a função
+  // Se voltou para menu, não executa
   if (current_screen == 0) return;
   
   // Executa função atual
