@@ -83,8 +83,8 @@ void clearSignalSlot(int slot) {
 void setupHardware() {
   Serial.begin(115200);
   delay(100);
-  if (!prefs.begin("nrfbox", false)) {
-    Serial.println("NVS: Erro ao abrir");
+  if (!prefs.begin("madcat", false)) {
+    Serial.println("NVS: Erro ao abrir namespace 'madcat'");
   }
   delay(10);
   selectedSignalSlot = prefs.getInt("selectedSlot", 0);
@@ -95,7 +95,7 @@ void setupHardware() {
   delay(10);
   u8g2.begin();
   u8g2.setFont(u8g2_font_6x10_tr);
-  u8g2.setContrast(128);
+  u8g2.setContrast(prefs.getUChar("brightness", 128));
   u8g2.clearBuffer();
   u8g2.drawStr(0, 10, "Iniciando...");
   u8g2.sendBuffer();
@@ -145,7 +145,8 @@ void setupHardware() {
 
 bool buttonPressed(uint8_t pin) {
   static unsigned long lastDebounceTime[4] = {0, 0, 0, 0};
-  static bool lastState[4] = {HIGH, HIGH, HIGH, HIGH};
+  static bool lastReading[4] = {HIGH, HIGH, HIGH, HIGH};
+  static bool buttonState[4] = {HIGH, HIGH, HIGH, HIGH};
   static const uint8_t pinMap[4] = {BTN_UP, BTN_DOWN, BTN_SELECT, BTN_BACK};
   uint8_t idx = 255;
   for (int i = 0; i < 4; i++) {
@@ -153,16 +154,19 @@ bool buttonPressed(uint8_t pin) {
   }
   if (idx == 255) return false;
   bool reading = digitalRead(pin);
-  if (reading == LOW && lastState[idx] == HIGH) {
-    if ((millis() - lastDebounceTime[idx]) > 150) {
-      lastDebounceTime[idx] = millis();
-      lastState[idx] = reading;
-      return true;
+  if (reading != lastReading[idx]) {
+    lastDebounceTime[idx] = millis();
+  }
+  if ((millis() - lastDebounceTime[idx]) > BUTTON_DEBOUNCE_MS) {
+    if (reading != buttonState[idx]) {
+      buttonState[idx] = reading;
+      if (buttonState[idx] == LOW) {
+        lastReading[idx] = reading;
+        return true;
+      }
     }
   }
-  if (reading == HIGH && lastState[idx] == LOW) {
-    lastState[idx] = reading;
-  }
+  lastReading[idx] = reading;
   return false;
 }
 
