@@ -30,14 +30,16 @@ const int RF_ITEM_COUNT = 4;
 const MenuItem wirelessItems[] = {
   {"BLE Scan",       6, bleScanSetup,        bleScanLoop},
   {"WiFi Scan",      7, wifiDeauthSetup,     wifiDeauthLoop},
+  {"WiFi Deauth",    7, wifiDeauthAttackSetup, wifiDeauthAttackLoop},
   {"Sour Apple",     8, sourAppleSetup,      sourAppleLoop},
 };
-const int WIRELESS_ITEM_COUNT = 3;
+const int WIRELESS_ITEM_COUNT = 4;
 
 const MenuItem attackItems[] = {
   {"CC1101 BruteForce", 4, cc1101BruteForceSetup, cc1101BruteForceLoop},
+  {"Sub-GHz DB",        4, subGHzDBSetup,         subGHzDBLoop},
 };
-const int ATTACK_ITEM_COUNT = 1;
+const int ATTACK_ITEM_COUNT = 2;
 
 const MenuItem recordingItems[] = {
   {"CC1101 Capture", 3, cc1101TransceiverSetup, cc1101TransceiverLoop},
@@ -63,7 +65,7 @@ namespace {
     void (*setupFunc)();
     void (*loopFunc)();
   };
-  FuncMapping allFuncs[12];
+  FuncMapping allFuncs[16];
   int totalFuncs = 0;
 }
 
