@@ -61,7 +61,7 @@ void setup() {
   initMenuSystem();
   bootAnimation();
   drawMenu();
-  Serial.println("MadCat OS v1.0 - Iniciado");
+  Serial.println("MadCat OS v2.0 - Iniciado");
 }
 
 void loop() {
