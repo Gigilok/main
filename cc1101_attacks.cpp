@@ -307,9 +307,7 @@ void cc1101BruteForceLoop() {
             ELECHOUSE_cc1101.setMHZ(BRUTE_FREQS[cc1101::bfFreqIndex] / 1000.0);
             ELECHOUSE_cc1101.SetTx();
             delay(5);
-          }
-        }
-      }
+                }
     }
   }
 }
