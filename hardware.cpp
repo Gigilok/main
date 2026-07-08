@@ -17,11 +17,8 @@ bool hasSavedSignal = false;
 SavedSignal savedSignals[MAX_SAVED_SIGNALS];
 int selectedSignalSlot = 0;
 
-// Interrupção de hardware para o botão Voltar
-void IRAM_ATTR handleBackInterrupt() {
-  back_pressed = true;
-  current_screen = 0;
-}
+// REMOVIDO: Interrupção de hardware que causava boot loop
+// void IRAM_ATTR handleBackInterrupt() { ... }
 
 // Carrega todos os sinais da NVS (memória interna ESP32)
 void loadAllSignals() {
@@ -66,20 +63,31 @@ void loadAllSignals() {
 
 void setupHardware() {
   Serial.begin(115200);
+  delay(100); // Aguarda serial estabilizar
+  
+  Serial.println("\n========================================");
+  Serial.println("nRF-BOX Pro - Inicializando...");
+  Serial.println("========================================");
+  
+  // Verifica memória livre
+  Serial.printf("Heap livre antes: %d bytes\n", ESP.getFreeHeap());
   
   // Inicializa NVS (memória interna do ESP32)
   if (!prefs.begin("nrfbox", false)) {
     Serial.println("NVS: Erro ao abrir namespace nrfbox");
   }
+  delay(10);
   
   // Carrega slot selecionado das configurações
   selectedSignalSlot = prefs.getInt("selectedSlot", 0);
   if (selectedSignalSlot < 0 || selectedSignalSlot >= MAX_SAVED_SIGNALS) {
     selectedSignalSlot = 0;
   }
+  Serial.printf("Slot selecionado: %d\n", selectedSignalSlot);
   
   // Inicializa I2C para OLED
   Wire.begin(OLED_SDA, OLED_SCL);
+  delay(10);
   
   // Inicializa OLED
   u8g2.begin();
@@ -88,25 +96,28 @@ void setupHardware() {
   u8g2.clearBuffer();
   u8g2.drawStr(0, 10, "Iniciando...");
   u8g2.sendBuffer();
+  delay(100);
   
   // Configura pinos dos botões com PULLUP
   pinMode(BTN_UP, INPUT_PULLUP);
   pinMode(BTN_DOWN, INPUT_PULLUP);
   pinMode(BTN_SELECT, INPUT_PULLUP);
   pinMode(BTN_BACK, INPUT_PULLUP);
+  delay(10);
   
-  // Anexa interrupção ao pino BACK
-  attachInterrupt(digitalPinToInterrupt(BTN_BACK), handleBackInterrupt, FALLING);
+  // REMOVIDO: Interrupção que causava boot loop
+  // Usar polling no loop principal é mais seguro
   
   // Inicializa SPI
   SPI.begin(NRF_SCK, NRF_MISO, NRF_MOSI);
+  delay(10);
   
   // Inicializa nRF24
   if (!radio.begin()) {
     Serial.println("Falha nRF24!");
     u8g2.drawStr(0, 25, "ERRO: nRF24L01");
     u8g2.sendBuffer();
-    delay(2000);
+    delay(500);
   } else {
     radio.setPALevel(RF24_PA_MAX);
     radio.setDataRate(RF24_2MBPS);
@@ -114,7 +125,9 @@ void setupHardware() {
     radio.stopListening();
     u8g2.drawStr(0, 25, "nRF24: OK");
     u8g2.sendBuffer();
+    Serial.println("nRF24: OK");
   }
+  delay(100);
   
   // Inicializa CC1101
   ELECHOUSE_cc1101.setSpiPin(NRF_SCK, NRF_MISO, NRF_MOSI, CC_CSN);
@@ -127,18 +140,24 @@ void setupHardware() {
     ELECHOUSE_cc1101.setModulation(0);
     ELECHOUSE_cc1101.setMHZ(433.92);
     u8g2.drawStr(0, 35, "CC1101: OK");
+    Serial.println("CC1101: OK");
   } else {
     u8g2.drawStr(0, 35, "ERRO: CC1101");
+    Serial.println("CC1101: ERRO");
   }
   u8g2.sendBuffer();
-  delay(800);
+  delay(200);
   
   // Desliga rádios inicialmente
   radio.powerDown();
   ELECHOUSE_cc1101.setSidle();
+  delay(50);
   
   // Carrega sinais salvos da NVS (memória interna)
   loadAllSignals();
+  
+  Serial.printf("Heap livre apos init: %d bytes\n", ESP.getFreeHeap());
+  Serial.println("Inicializacao completa!");
   
   u8g2.clearBuffer();
 }
@@ -176,8 +195,20 @@ bool buttonPressed(uint8_t pin) {
   return false;
 }
 
-// Função para verificar flag de interrupção
+// Função para verificar botão BACK via polling (sem interrupção)
 void checkBackInterruptFlag() {
+  static bool backWasPressed = false;
+  bool backNow = (digitalRead(BTN_BACK) == LOW);
+  
+  if (backNow && !backWasPressed) {
+    back_pressed = true;
+    backWasPressed = true;
+  }
+  
+  if (!backNow) {
+    backWasPressed = false;
+  }
+  
   if (back_pressed) {
     back_pressed = false;
     current_screen = 0;
