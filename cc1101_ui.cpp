@@ -43,42 +43,6 @@ void cc1101ScannerLoop() {
 // CC1101 CAPTURE / TRANSCEIVER
 // ============================================
 
-void cc1101TransceiverSetup() {
-  setCCState(CC_IDLE);
-  setTXPlaying(false);
-  u8g2.clearBuffer();
-  drawFunctionHeader("CC1101 Capture");
-  if (hasSavedSignal) {
-    u8g2.setFont(u8g2_font_6x10_tr);
-    u8g2.setCursor(0, 28);
-    u8g2.print("Slot: ");
-    u8g2.print(selectedSignalSlot + 1);
-    u8g2.print("/");
-    u8g2.print(MAX_SAVED_SIGNALS);
-    u8g2.setCursor(0, 40);
-    u8g2.print("Freq: ");
-    u8g2.print(currentSignal.frequency / 1000.0, 3);
-    u8g2.print(" MHz");
-    u8g2.setCursor(0, 52);
-    u8g2.print("RSSI: ");
-    u8g2.print(currentSignal.rssi);
-    u8g2.print(" dBm");
-    u8g2.setCursor(0, 62);
-    u8g2.print("UP:Play SEL:Rec B:Menu");
-  } else {
-    u8g2.setFont(u8g2_font_6x10_tr);
-    u8g2.setCursor(0, 28);
-    u8g2.print("Nenhum sinal salvo");
-    u8g2.setCursor(0, 40);
-    u8g2.print("SEL: Gravar novo");
-    u8g2.setCursor(0, 52);
-    u8g2.print("DOWN: BruteForce");
-    u8g2.setCursor(0, 62);
-    u8g2.print("BACK: Voltar ao menu");
-  }
-  u8g2.sendBuffer();
-}
-
 void cc1101TransceiverLoop() {
   if (buttonPressed(BTN_BACK)) {
     resetCC1101State();
@@ -149,17 +113,20 @@ void cc1101TransceiverLoop() {
   else if (ccState == CC_CAPTURING) {
     uint32_t elapsed = millis() - getCaptureStartTime();
     int remaining = (CAPTURE_TIMEOUT_MS - elapsed) / 1000;
+    // Usa progresso baseado no tempo em vez de captureIndex (inacessível aqui)
+    int progressPercent = (elapsed * 100) / CAPTURE_TIMEOUT_MS;
     u8g2.setCursor(0, 42);
     u8g2.print("Tempo: ");
     u8g2.print(remaining);
     u8g2.print("s   ");
     u8g2.setCursor(0, 55);
-    u8g2.print("Pulsos: ");
-    u8g2.print(captureIndex);
+    u8g2.print("Prog: ");
+    u8g2.print(progressPercent);
+    u8g2.print("%");
     u8g2.sendBuffer();
-    if (elapsed >= CAPTURE_TIMEOUT_MS || captureIndex >= MAX_RAW_DATA - 10) {
+    if (elapsed >= CAPTURE_TIMEOUT_MS) {
       stopCapture();
-      if (captureIndex > 10) {
+      if (currentSignal.dataLength > 10) {
         saveSignalToSlot(selectedSignalSlot, currentSignal);
         u8g2.clearBuffer();
         drawFunctionHeader("CC1101 Capture");
@@ -234,6 +201,7 @@ void cc1101TransceiverLoop() {
     if (buttonPressed(BTN_UP)) setTXPlaying(true);
   }
 }
+
 
 // ============================================
 // CC1101 FREQUENCY SWEEP
