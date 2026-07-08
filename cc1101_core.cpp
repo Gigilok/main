@@ -267,6 +267,12 @@ void jamChannel(uint32_t freqKHz) {
 }
 
 // ============================================
+// GETTER ADICIONAL
+// ============================================
+
+int getCaptureIndex() { return (int)captureIndex; }
+
+// ============================================
 // GETTERS/SETTERS DO ESTADO
 // ============================================
 
