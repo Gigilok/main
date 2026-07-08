@@ -37,6 +37,24 @@ jobs:
       run: |
         pio run --environment esp32dev
         
+    - name: Copy boot_app0.bin
+      run: |
+        # Copia o boot_app0.bin necessário para flash
+        cp ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin .pio/build/esp32dev/ || \
+        cp ~/.platformio/packages/framework-arduinoespressif32@*/tools/partitions/boot_app0.bin .pio/build/esp32dev/ || \
+        find ~/.platformio -name "boot_app0.bin" -exec cp {} .pio/build/esp32dev/ \;
+        
+    - name: List build files
+      run: |
+        echo "=== Arquivos gerados ==="
+        ls -la .pio/build/esp32dev/
+        echo ""
+        echo "=== Endereços de flash ==="
+        echo "0x1000  - bootloader.bin"
+        echo "0x8000  - partitions.bin"
+        echo "0xE000  - boot_app0.bin  <-- IMPORTANTE!"
+        echo "0x10000 - firmware.bin"
+        
     - name: Upload firmware artifact
       uses: actions/upload-artifact@v4
       with:
@@ -46,6 +64,7 @@ jobs:
           .pio/build/esp32dev/firmware.elf
           .pio/build/esp32dev/partitions.bin
           .pio/build/esp32dev/bootloader.bin
+          .pio/build/esp32dev/boot_app0.bin
         retention-days: 30
         
     - name: Create release package
@@ -55,12 +74,39 @@ jobs:
         cp .pio/build/esp32dev/firmware.bin release/
         cp .pio/build/esp32dev/partitions.bin release/
         cp .pio/build/esp32dev/bootloader.bin release/
-        echo "nRF-BOX Pro Firmware" > release/README.txt
-        echo "Version: ${{ github.ref_name }}" >> release/README.txt
-        echo "Date: $(date)" >> release/README.txt
-        echo "" >> release/README.txt
-        echo "Flash command:" >> release/README.txt
-        echo "esptool.py --chip esp32 --baud 921600 write_flash 0x1000 bootloader.bin 0x8000 partitions.bin 0x10000 firmware.bin" >> release/README.txt
+        cp .pio/build/esp32dev/boot_app0.bin release/
+        cat > release/FLASH_COMMANDS.txt << 'EOF'
+========================================
+nRF-BOX Pro - Comandos de Flash
+========================================
+
+METODO 1 - esptool.py (recomendado):
+-------------------------------------
+esptool.py --chip esp32 --baud 921600 --before default_reset --after hard_reset write_flash -z --flash_mode dio --flash_freq 80m --flash_size 4MB \
+  0x1000 bootloader.bin \
+  0x8000 partitions.bin \
+  0xE000 boot_app0.bin \
+  0x10000 firmware.bin
+
+METODO 2 - ESP Flash Download Tool:
+------------------------------------
+Enderecos:
+  0x1000  -> bootloader.bin
+  0x8000  -> partitions.bin
+  0xE000  -> boot_app0.bin  <-- NAO ESQUECER!
+  0x10000 -> firmware.bin
+
+Configuracoes:
+  SPI Speed: 80MHz
+  SPI Mode: DIO
+  Flash Size: 32Mbit (4MB)
+
+METODO 3 - PlatformIO (se tiver o projeto):
+--------------------------------------------
+pio run --target upload
+
+========================================
+EOF
         
     - name: Upload release assets
       if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
@@ -70,7 +116,8 @@ jobs:
           release/firmware.bin
           release/partitions.bin
           release/bootloader.bin
-          release/README.txt
+          release/boot_app0.bin
+          release/FLASH_COMMANDS.txt
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
