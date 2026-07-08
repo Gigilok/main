@@ -1,9 +1,5 @@
 #include "config.h"
 
-// ============================================
-// FREQUENCIAS E PROTOCOLOS
-// ============================================
-
 const uint32_t SCAN_FREQUENCIES[] = {315000, 433920, 868350, 915000};
 const int NUM_FREQS = 4;
 
@@ -51,10 +47,6 @@ const uint32_t COMMON_CODES[] = {
 };
 const int NUM_COMMON_CODES = sizeof(COMMON_CODES) / sizeof(COMMON_CODES[0]);
 
-// ============================================
-// VARIAVEIS GLOBAIS DO CC1101
-// ============================================
-
 namespace {
   CCState ccState = CC_IDLE;
   volatile uint32_t lastInterruptTime = 0;
@@ -68,7 +60,6 @@ namespace {
   uint32_t detectedFrequency = 0;
 }
 
-// Variaveis dos ataques (acessadas por cc1101_attacks.cpp)
 namespace cc1101 {
   bool rolljamActive = false;
   uint32_t rolljamCode1 = 0;
@@ -77,14 +68,12 @@ namespace cc1101 {
   bool rolljamHasCode2 = false;
   int rolljamStep = 0;
   unsigned long rolljamTimer = 0;
-
   bool rollingPwnActive = false;
   int rollingPwnStep = 0;
   int rollingPwnCounter = 0;
   unsigned long rollingPwnTimer = 0;
   uint32_t capturedCodes[10];
   int capturedCodeCount = 0;
-
   BFMode bfMode = BF_MODE_COMMON;
   BFState bfState = BF_IDLE;
   int bfFreqIndex = 0;
@@ -93,10 +82,6 @@ namespace cc1101 {
   unsigned long bfStartTime = 0;
   int bfCodesSent = 0;
 }
-
-// ============================================
-// FUNCOES BASICAS DO CC1101
-// ============================================
 
 void resetCC1101State() {
   ccState = CC_IDLE;
@@ -111,9 +96,9 @@ void resetCC1101State() {
 void drawFunctionHeader(const char* title) {
   u8g2.setFont(u8g2_font_5x7_tr);
   u8g2.setCursor(0, 7);
-  u8g2.print("nRF-BOX Pro");
+  u8g2.print("MadCat OS");
   u8g2.setCursor(95, 7);
-  u8g2.print(FIRMWARE_VERSION);
+  u8g2.print(FIRMWARE_SHORT);
   u8g2.drawHLine(0, 9, 128);
   u8g2.setFont(u8g2_font_6x10_tr);
   u8g2.setCursor(0, 20);
@@ -266,16 +251,7 @@ void jamChannel(uint32_t freqKHz) {
   digitalWrite(CC_GDO0, LOW);
 }
 
-// ============================================
-// GETTER ADICIONAL
-// ============================================
-
 int getCaptureIndex() { return (int)captureIndex; }
-
-// ============================================
-// GETTERS/SETTERS DO ESTADO
-// ============================================
-
 CCState getCCState() { return ccState; }
 void setCCState(CCState state) { ccState = state; }
 bool isTXPlaying() { return txPlaying; }
