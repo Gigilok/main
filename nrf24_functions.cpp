@@ -47,7 +47,6 @@ void nrfScannerLoop() {
   u8g2.setFont(u8g2_font_5x7_tr);
   u8g2.setCursor(0, 22);
   u8g2.print("2.4GHz Spectrum");
-  int barWidth = 1;
   for (int i = 0; i < 64; i++) {
     int ch = displayOffset + i;
     if (ch >= 128) break;
