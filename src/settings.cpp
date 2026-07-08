@@ -31,16 +31,32 @@ void settingsLoop() {
     delay(200);
     return;
   }
-  if (buttonPressed(BTN_UP) && brightness < 255) {
+  
+  // Controle de brilho
+  if (buttonPressed(BTN_UP)) {
     brightness += 25;
     if (brightness > 255) brightness = 255;
     u8g2.setContrast(brightness);
   }
-  if (buttonPressed(BTN_DOWN) && brightness > 0) {
-    brightness -= 25;
-    if (brightness > 255) brightness = 0;
+  if (buttonPressed(BTN_DOWN)) {
+    if (brightness >= 25) brightness -= 25;
+    else brightness = 0;
     u8g2.setContrast(brightness);
   }
+  
+  // Mudar slot ativo
+  static unsigned long lastSlotChange = 0;
+  if (millis() - lastSlotChange > 200) {
+    if (buttonPressed(BTN_UP) && selectedSignalSlot < MAX_SAVED_SIGNALS - 1) {
+      selectedSignalSlot++;
+      lastSlotChange = millis();
+    }
+    if (buttonPressed(BTN_DOWN) && selectedSignalSlot > 0) {
+      selectedSignalSlot--;
+      lastSlotChange = millis();
+    }
+  }
+  
   if (buttonPressed(BTN_SELECT)) {
     prefs.putUChar("brightness", brightness);
     prefs.putInt("selectedSlot", selectedSignalSlot);
@@ -52,6 +68,7 @@ void settingsLoop() {
     u8g2.sendBuffer();
     delay(500);
   }
+  
   u8g2.clearBuffer();
   drawFunctionHeader("Configuracoes");
   u8g2.setFont(u8g2_font_6x10_tr);
@@ -78,3 +95,4 @@ void settingsLoop() {
   }
   u8g2.sendBuffer();
 }
+
