@@ -56,7 +56,6 @@ const int NUM_COMMON_CODES = sizeof(COMMON_CODES) / sizeof(COMMON_CODES[0]);
 // ============================================
 
 namespace {
-  enum CCState { CC_IDLE, CC_SCANNING, CC_CAPTURING, CC_TRANSMITTING };
   CCState ccState = CC_IDLE;
   volatile uint32_t lastInterruptTime = 0;
   volatile uint16_t captureIndex = 0;
@@ -86,12 +85,7 @@ namespace cc1101 {
   uint32_t capturedCodes[10];
   int capturedCodeCount = 0;
 
-  enum BFMode {
-    BF_MODE_COMMON, BF_MODE_DEBRUIJN, BF_MODE_FULL,
-    BF_MODE_ROLLJAM, BF_MODE_ROLLINGPWN
-  };
   BFMode bfMode = BF_MODE_COMMON;
-  enum BFState { BF_IDLE, BF_RUNNING, BF_PAUSED };
   BFState bfState = BF_IDLE;
   int bfFreqIndex = 0;
   int bfProtocolIndex = 0;
@@ -273,7 +267,7 @@ void jamChannel(uint32_t freqKHz) {
 }
 
 // ============================================
-// VARIAVEIS DE ESTADO (acesso externo)
+// GETTERS/SETTERS DO ESTADO
 // ============================================
 
 CCState getCCState() { return ccState; }
