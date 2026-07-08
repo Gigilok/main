@@ -2,48 +2,58 @@
 
 void bootAnimation() {
   u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_6x10_tr);
-  u8g2.drawStr(30, 10, "nRF-BOX");
-  u8g2.drawHLine(0, 32, 128);
-  u8g2.sendBuffer();
-  delay(200);
-
-  u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_7x14B_tr);
-  u8g2.drawStr(15, 20, "nRF-BOX Pro");
   u8g2.setFont(u8g2_font_5x7_tr);
-  u8g2.drawStr(10, 35, "RF Hacking Tool");
-  u8g2.drawHLine(0, 40, 128);
+  u8g2.drawStr(35, 62, "MadCat OS");
   u8g2.sendBuffer();
   delay(300);
 
   u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_7x14B_tr);
-  u8g2.drawStr(15, 20, "nRF-BOX Pro");
+  u8g2.drawXBM(32, 0, 64, 64, cat_open);
   u8g2.setFont(u8g2_font_5x7_tr);
-  u8g2.drawStr(15, 35, "CC1101 | nRF24 | BLE");
-  u8g2.drawStr(25, 45, "WiFi | SourApple");
-  u8g2.drawHLine(0, 52, 128);
+  u8g2.drawStr(35, 62, "MadCat OS");
+  u8g2.sendBuffer();
+  delay(600);
+
+  u8g2.clearBuffer();
+  u8g2.drawXBM(32, 0, 64, 64, cat_blink);
+  u8g2.setFont(u8g2_font_5x7_tr);
+  u8g2.drawStr(35, 62, "MadCat OS");
+  u8g2.sendBuffer();
+  delay(150);
+
+  u8g2.clearBuffer();
+  u8g2.drawXBM(32, 0, 64, 64, cat_open);
+  u8g2.setFont(u8g2_font_5x7_tr);
+  u8g2.drawStr(35, 62, "MadCat OS");
   u8g2.sendBuffer();
   delay(400);
 
   u8g2.clearBuffer();
-  u8g2.setFont(u8g2_font_7x14B_tr);
-  u8g2.drawStr(15, 18, "nRF-BOX Pro");
+  u8g2.drawXBM(32, 0, 64, 64, cat_blink);
   u8g2.setFont(u8g2_font_5x7_tr);
-  u8g2.drawStr(15, 32, "CC1101 | nRF24 | BLE");
-  u8g2.drawStr(25, 42, "WiFi | SourApple");
-  u8g2.drawFrame(20, 50, 88, 8);
-  for (int i = 0; i <= 84; i += 4) {
-    u8g2.drawBox(22, 52, i, 4);
-    u8g2.sendBuffer();
-    delay(30);
-  }
-  u8g2.setFont(u8g2_font_5x7_tr);
-  u8g2.setCursor(90, 62);
-  u8g2.print(FIRMWARE_VERSION);
+  u8g2.drawStr(35, 62, "MadCat OS");
   u8g2.sendBuffer();
-  delay(500);
+  delay(150);
+
+  u8g2.clearBuffer();
+  u8g2.drawXBM(32, 0, 64, 64, cat_open);
+  u8g2.setFont(u8g2_font_5x7_tr);
+  u8g2.drawStr(35, 62, "MadCat OS");
+  u8g2.drawFrame(20, 52, 88, 6);
+  u8g2.sendBuffer();
+  delay(200);
+
+  for (int i = 0; i <= 84; i += 4) {
+    u8g2.drawBox(22, 54, i, 2);
+    u8g2.sendBuffer();
+    delay(25);
+  }
+
+  u8g2.setFont(u8g2_font_5x7_tr);
+  u8g2.setCursor(95, 62);
+  u8g2.print(FIRMWARE_SHORT);
+  u8g2.sendBuffer();
+  delay(400);
 }
 
 void setup() {
@@ -51,7 +61,7 @@ void setup() {
   initMenuSystem();
   bootAnimation();
   drawMenu();
-  Serial.println("Setup OK - nRF-BOX Pro v2.3");
+  Serial.println("MadCat OS v1.0 - Iniciado");
 }
 
 void loop() {
