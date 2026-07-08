@@ -1,0 +1,29 @@
+🆕 NOVAS FUNÇÕES ADICIONADAS
+1. CC1101 Brute Force (De Bruijn)
+Funciona SEM capturar o sinal antes. Testa automaticamente:
+ 
+16 frequências comuns (300-915 MHz)
+ 
+7 protocolos (PT2262, EV1527, Kaku, HT12E, etc.)
+ 
+De Bruijn sequence - testa todas as combinações de bits de forma otimizada
+ 
+Direção reversível - pode ir crescente ou decrescente
+ 
+Pausável - SEL pausa/continua, BACK volta ao menu
+2. CC1101 Frequency Sweep
+ 
+Varre toda a faixa 300-928 MHz em tempo real
+ 
+Mostra gráfico tipo "waterfall" no display
+ 
+Detecta picos de RSSI automaticamente
+ 
+Navegação com UP/DOWN para ajustar velocidade
+3. Múltiplos Slots de Salvamento
+ 
+Até 5 sinais salvos na memória NVS
+ 
+Nomeados automaticamente (Sinal 1, Sinal 2, etc.)
+ 
+Seleção de slot na tela de captura
