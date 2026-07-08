@@ -22,9 +22,6 @@ void setup() {
 
 // ==================== LOOP ====================
 void loop() {
-  // Alimenta o watchdog a cada loop
-  ESP.wdtFeed();
-  
   // Verifica botão BACK via polling (sem interrupção)
   checkBackInterruptFlag();
   
@@ -34,5 +31,5 @@ void loop() {
     runCurrentFunction();
   }
   
-  delay(10); // Pequeno delay para estabilidade e WDT
+  delay(10); // delay() alimenta o watchdog automaticamente
 }
