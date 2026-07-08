@@ -209,6 +209,7 @@ void setCCState(CCState state);
 bool isTXPlaying();
 void setTXPlaying(bool val);
 int getTXProgress();
+int getCaptureIndex();
 uint32_t getCaptureStartTime();
 uint32_t getDetectedFrequency();
 void setDetectedFrequency(uint32_t freq);
