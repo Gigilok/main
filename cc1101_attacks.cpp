@@ -1,9 +1,5 @@
 #include "config.h"
 
-// ============================================
-// ROLLJAM ATTACK
-// ============================================
-
 void rollJamAttackStep() {
   if (!cc1101::rolljamActive) return;
   const RCSwitchProtocol& p = protocols[0];
@@ -69,10 +65,6 @@ void rollJamAttackStep() {
   }
 }
 
-// ============================================
-// ROLLING PWN ATTACK
-// ============================================
-
 void rollingPwnAttackStep() {
   if (!cc1101::rollingPwnActive) return;
   const RCSwitchProtocol& p = protocols[0];
@@ -115,7 +107,7 @@ void rollingPwnAttackStep() {
           delayMicroseconds(5000);
         }
         for (int i = 0; i < 20; i++) {
-          uint32_t fakeCode = 0xFFFF00 | (cc1101::rollingPwnCounter + i);
+                    uint32_t fakeCode = 0xFFFF00 | (cc1101::rollingPwnCounter + i);
           transmitCode(fakeCode, 24, p);
           delayMicroseconds(3000);
         }
@@ -149,10 +141,6 @@ void rollingPwnAttackStep() {
       break;
   }
 }
-
-// ============================================
-// BRUTE FORCE LOOP
-// ============================================
 
 void cc1101BruteForceLoop() {
   if (buttonPressed(BTN_BACK)) {
@@ -212,7 +200,6 @@ void cc1101BruteForceLoop() {
     delay(150);
   }
   
-  // Desenha UI
   u8g2.clearBuffer();
   drawFunctionHeader("CC1101 BruteForce");
   u8g2.setFont(u8g2_font_6x10_tr);
@@ -255,7 +242,6 @@ void cc1101BruteForceLoop() {
   u8g2.print(cc1101::bfCodesSent);
   u8g2.sendBuffer();
   
-    // Executa ataque
   if (cc1101::bfState == cc1101::BF_RUNNING) {
     if (cc1101::bfMode == cc1101::BF_MODE_ROLLJAM) {
       rollJamAttackStep();
@@ -345,4 +331,3 @@ void cc1101BruteForceSetup() {
   u8g2.sendBuffer();
 }
 
-  
