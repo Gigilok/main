@@ -255,10 +255,14 @@ void cc1101BruteForceLoop() {
   u8g2.print(cc1101::bfCodesSent);
   u8g2.sendBuffer();
   
-  // Executa ataque
+    // Executa ataque
   if (cc1101::bfState == cc1101::BF_RUNNING) {
-    if (cc1101::bfMode == cc1101::BF_MODE_ROLLJAM) rollJamAttackStep();
-    else if (cc1101::bfMode == cc1101::BF_MODE_ROLLINGPWN) rollingPwnAttackStep();
+    if (cc1101::bfMode == cc1101::BF_MODE_ROLLJAM) {
+      rollJamAttackStep();
+    }
+    else if (cc1101::bfMode == cc1101::BF_MODE_ROLLINGPWN) {
+      rollingPwnAttackStep();
+    }
     else {
       const RCSwitchProtocol& p = protocols[cc1101::bfProtocolIndex];
       if (cc1101::bfMode == cc1101::BF_MODE_COMMON) {
@@ -307,7 +311,9 @@ void cc1101BruteForceLoop() {
             ELECHOUSE_cc1101.setMHZ(BRUTE_FREQS[cc1101::bfFreqIndex] / 1000.0);
             ELECHOUSE_cc1101.SetTx();
             delay(5);
-                }
+          }
+        }
+      }
     }
   }
 }
@@ -338,3 +344,5 @@ void cc1101BruteForceSetup() {
   u8g2.print("BACK: Menu");
   u8g2.sendBuffer();
 }
+
+  
