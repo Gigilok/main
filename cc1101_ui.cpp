@@ -43,6 +43,9 @@ void cc1101ScannerLoop() {
 // CC1101 CAPTURE / TRANSCEIVER
 // ============================================
 
+// DECLARACAO ANTECIPADA (prototipo) para uso no loop
+void cc1101TransceiverSetup();
+
 void cc1101TransceiverLoop() {
   if (buttonPressed(BTN_BACK)) {
     resetCC1101State();
@@ -113,7 +116,6 @@ void cc1101TransceiverLoop() {
   else if (ccState == CC_CAPTURING) {
     uint32_t elapsed = millis() - getCaptureStartTime();
     int remaining = (CAPTURE_TIMEOUT_MS - elapsed) / 1000;
-    // Usa progresso baseado no tempo em vez de captureIndex (inacessível aqui)
     int progressPercent = (elapsed * 100) / CAPTURE_TIMEOUT_MS;
     u8g2.setCursor(0, 42);
     u8g2.print("Tempo: ");
@@ -202,6 +204,73 @@ void cc1101TransceiverLoop() {
   }
 }
 
+// DEFINICAO da funcao (depois do loop que a usa)
+void cc1101TransceiverSetup() {
+  setCCState(CC_IDLE);
+  setTXPlaying(false);
+  u8g2.clearBuffer();
+  drawFunctionHeader("CC1101 Capture");
+  if (hasSavedSignal) {
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.setCursor(0, 28);
+    u8g2.print("Slot: ");
+    u8g2.print(selectedSignalSlot + 1);
+    u8g2.print("/");
+    u8g2.print(MAX_SAVED_SIGNALS);
+    u8g2.setCursor(0, 40);
+    u8g2.print("Freq: ");
+    u8g2.print(currentSignal.frequency / 1000.0, 3);
+    u8g2.print(" MHz");
+    u8g2.setCursor(0, 52);
+    u8g2.print("RSSI: ");
+    u8g2.print(currentSignal.rssi);
+    u8g2.print(" dBm");
+    u8g2.setCursor(0, 62);
+    u8g2.print("UP:Play SEL:Rec B:Menu");
+  } else {
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.setCursor(0, 28);
+    u8g2.print("Nenhum sinal salvo");
+    u8g2.setCursor(0, 40);
+    u8g2.print("SEL: Gravar novo");
+    u8g2.setCursor(0, 52);
+    u8g2.print("DOWN: BruteForce");
+    u8g2.setCursor(0, 62);
+    u8g2.print("BACK: Voltar ao menu");
+  }
+  u8g2.sendBuffer();
+}
+
+// ============================================
+// CC1101 BRUTE FORCE SETUP
+// ============================================
+
+void cc1101BruteForceSetup() {
+  cc1101::bfState = cc1101::BF_IDLE;
+  cc1101::bfFreqIndex = 0;
+  cc1101::bfProtocolIndex = 0;
+  cc1101::bfCode = 0;
+  cc1101::bfCodesSent = 0;
+  cc1101::rolljamActive = false;
+  cc1101::rollingPwnActive = false;
+  cc1101::rolljamStep = 0;
+  cc1101::rolljamHasCode1 = false;
+  cc1101::rolljamHasCode2 = false;
+  cc1101::rollingPwnStep = 0;
+  cc1101::capturedCodeCount = 0;
+  u8g2.clearBuffer();
+  drawFunctionHeader("CC1101 BruteForce");
+  u8g2.setFont(u8g2_font_6x10_tr);
+  u8g2.setCursor(0, 28);
+  u8g2.print("SEL: Iniciar/Parar");
+  u8g2.setCursor(0, 40);
+  u8g2.print("UP: Prox. Modo");
+  u8g2.setCursor(0, 52);
+  u8g2.print("DOWN: Prox. Freq");
+  u8g2.setCursor(0, 62);
+  u8g2.print("BACK: Menu");
+  u8g2.sendBuffer();
+}
 
 // ============================================
 // CC1101 FREQUENCY SWEEP
