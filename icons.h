@@ -3,7 +3,8 @@
 
 #include <Arduino.h>
 
-// Ícones 16x16 (32 bytes cada)
+extern const unsigned char cat_open[] PROGMEM;
+extern const unsigned char cat_blink[] PROGMEM;
 
 extern const unsigned char icon_scanner[] PROGMEM;
 extern const unsigned char icon_jammer[] PROGMEM;
@@ -15,7 +16,9 @@ extern const unsigned char icon_ble[] PROGMEM;
 extern const unsigned char icon_wifi[] PROGMEM;
 extern const unsigned char icon_apple[] PROGMEM;
 extern const unsigned char icon_settings[] PROGMEM;
+extern const unsigned char icon_signals[] PROGMEM;
+extern const unsigned char icon_info[] PROGMEM;
 
 extern const unsigned char* menu_icons[];
 
-#endif // ICONS_H
+#endif
