@@ -16,11 +16,16 @@ void setup() {
   delay(1500);
   
   drawMenu();
+  
+  Serial.println("Setup completo. Entrando no loop...");
 }
 
 // ==================== LOOP ====================
 void loop() {
-  // Verifica interrupção de hardware do botão BACK
+  // Alimenta o watchdog a cada loop
+  ESP.wdtFeed();
+  
+  // Verifica botão BACK via polling (sem interrupção)
   checkBackInterruptFlag();
   
   if (current_screen == 0) {
@@ -29,5 +34,5 @@ void loop() {
     runCurrentFunction();
   }
   
-  delay(10); // Pequeno delay para estabilidade
+  delay(10); // Pequeno delay para estabilidade e WDT
 }
