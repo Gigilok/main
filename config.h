@@ -33,22 +33,22 @@
 #define OLED_SCL 22
 
 // nRF24L01
-#define NRF_CE   5
-#define NRF_CSN  4
+#define NRF_CE   25
+#define NRF_CSN  26
 #define NRF_SCK  18
 #define NRF_MISO 19
 #define NRF_MOSI 23
 
 // CC1101
-#define CC_CSN   15
-#define CC_GDO0  16
-#define CC_GDO2  17
+#define CC_CSN   27
+#define CC_GDO0  4
+#define CC_GDO2  16
 
 // Botoes
-#define BTN_UP     25
-#define BTN_DOWN   26
-#define BTN_SELECT 27
-#define BTN_BACK   14
+#define BTN_UP     17
+#define BTN_DOWN   14
+#define BTN_SELECT 32
+#define BTN_BACK   33
 
 // ============================================
 // CONSTANTES DO SISTEMA
