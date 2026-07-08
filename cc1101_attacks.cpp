@@ -117,11 +117,11 @@ void rollingPwnAttackStep() {
         uint32_t fakeCode = 0xFFFF00 | (cc1101::rollingPwnCounter + i);
         transmitCode(fakeCode, 24, p);
         delayMicroseconds(3000);
-      }
       digitalWrite(CC_GDO0, LOW);
       ELECHOUSE_cc1101.setSidle();
       cc1101::rollingPwnStep = 2;
       cc1101::rollingPwnTimer = millis();
+      
       break;
     case 2:
       if (millis() - cc1101::rollingPwnTimer > 2000) {
@@ -312,3 +312,29 @@ void cc1101BruteForceLoop() {
   }
 }
 
+void cc1101BruteForceSetup() {
+  cc1101::bfState = cc1101::BF_IDLE;
+  cc1101::bfFreqIndex = 0;
+  cc1101::bfProtocolIndex = 0;
+  cc1101::bfCode = 0;
+  cc1101::bfCodesSent = 0;
+  cc1101::rolljamActive = false;
+  cc1101::rollingPwnActive = false;
+  cc1101::rolljamStep = 0;
+  cc1101::rolljamHasCode1 = false;
+  cc1101::rolljamHasCode2 = false;
+  cc1101::rollingPwnStep = 0;
+  cc1101::capturedCodeCount = 0;
+  u8g2.clearBuffer();
+  drawFunctionHeader("CC1101 BruteForce");
+  u8g2.setFont(u8g2_font_6x10_tr);
+  u8g2.setCursor(0, 28);
+  u8g2.print("SEL: Iniciar/Parar");
+  u8g2.setCursor(0, 40);
+  u8g2.print("UP: Prox. Modo");
+  u8g2.setCursor(0, 52);
+  u8g2.print("DOWN: Prox. Freq");
+  u8g2.setCursor(0, 62);
+  u8g2.print("BACK: Menu");
+  u8g2.sendBuffer();
+}
