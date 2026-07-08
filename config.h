@@ -12,8 +12,6 @@
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
 #include <WiFi.h>
-#include <esp_wifi.h>
-#include <nvs_flash.h>
 #include <Preferences.h>
 
 // ==================== VERSÃO DO FIRMWARE ====================
