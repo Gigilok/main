@@ -1,9 +1,5 @@
 #include "config.h"
 
-// ============================================
-// CC1101 SCANNER
-// ============================================
-
 void cc1101ScannerSetup() {
   u8g2.clearBuffer();
   drawFunctionHeader("CC1101 Scanner");
@@ -39,11 +35,6 @@ void cc1101ScannerLoop() {
   delay(100);
 }
 
-// ============================================
-// CC1101 CAPTURE / TRANSCEIVER
-// ============================================
-
-// DECLARACAO ANTECIPADA (prototipo) para uso no loop
 void cc1101TransceiverSetup();
 
 void cc1101TransceiverLoop() {
@@ -130,23 +121,38 @@ void cc1101TransceiverLoop() {
       stopCapture();
       if (currentSignal.dataLength > 10) {
         saveSignalToSlot(selectedSignalSlot, currentSignal);
+        DecodedSignal decoded = decodeCapturedSignal();
+        
         u8g2.clearBuffer();
         drawFunctionHeader("CC1101 Capture");
         u8g2.setFont(u8g2_font_6x10_tr);
-        u8g2.setCursor(0, 28);
+        u8g2.setCursor(0, 24);
         u8g2.print("Sinal Capturado!");
-        u8g2.setCursor(0, 40);
+        u8g2.setCursor(0, 34);
         u8g2.print("Freq: ");
         u8g2.print(currentSignal.frequency / 1000.0, 3);
         u8g2.print(" MHz");
-        u8g2.setCursor(0, 52);
+        u8g2.setCursor(0, 44);
         u8g2.print("Pulsos: ");
         u8g2.print(currentSignal.dataLength);
-        u8g2.setCursor(0, 62);
-        u8g2.print("SALVO! B:Menu");
+        
+        if (decoded.valid) {
+          u8g2.setCursor(0, 54);
+          u8g2.print("Proto: ");
+          u8g2.print(protocols[decoded.protocolIndex].name);
+          u8g2.setCursor(0, 62);
+          u8g2.print("Code: 0x");
+          u8g2.print(decoded.code, HEX);
+        } else {
+          u8g2.setCursor(0, 54);
+          u8g2.print("Proto: Nao detectado");
+          u8g2.setCursor(0, 62);
+          u8g2.print("SALVO! B:Menu");
+        }
+        
         u8g2.sendBuffer();
         uint32_t waitStart = millis();
-        while (millis() - waitStart < 3000) {
+        while (millis() - waitStart < 4000) {
           if (buttonPressed(BTN_BACK)) break;
           delay(10);
         }
@@ -204,7 +210,6 @@ void cc1101TransceiverLoop() {
   }
 }
 
-// DEFINICAO da funcao (depois do loop que a usa)
 void cc1101TransceiverSetup() {
   setCCState(CC_IDLE);
   setTXPlaying(false);
@@ -240,10 +245,6 @@ void cc1101TransceiverSetup() {
   }
   u8g2.sendBuffer();
 }
-
-// ============================================
-// CC1101 FREQUENCY SWEEP
-// ============================================
 
 namespace {
   bool sweepRunning = false;
