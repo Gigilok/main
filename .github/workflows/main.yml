@@ -1,4 +1,4 @@
-name: Build nRF-BOX Pro Firmware
+name: Build MadCat OS v2.0 Firmware
 
 on:
   push:
@@ -56,7 +56,7 @@ jobs:
     - name: Upload firmware artifact
       uses: actions/upload-artifact@v4
       with:
-        name: nrf-box-pro-firmware
+        name: madcat-os-v2.0-firmware
         path: |
           .pio/build/esp32dev/firmware.bin
           .pio/build/esp32dev/firmware.elf
@@ -73,9 +73,17 @@ jobs:
         cp .pio/build/esp32dev/partitions.bin release/
         cp .pio/build/esp32dev/bootloader.bin release/
         cp .pio/build/esp32dev/boot_app0.bin release/
-        echo "nRF-BOX Pro Firmware" > release/README.txt
+        echo "MadCat OS v2.0" > release/README.txt
         echo "Version: ${{ github.ref_name }}" >> release/README.txt
         echo "Date: $(date)" >> release/README.txt
+        echo "" >> release/README.txt
+        echo "Funcionalidades v2.0:" >> release/README.txt
+        echo "- RollJam com decodificacao RC-Switch real" >> release/README.txt
+        echo "- Rolling-PWN com previsao de codigos" >> release/README.txt
+        echo "- WiFi Deauth com frames 802.11 reais" >> release/README.txt
+        echo "- Banco de dados Sub-GHz (24 marcas)" >> release/README.txt
+        echo "- Analisador de protocolo automatico" >> release/README.txt
+        echo "- BruteForce otimizado (Smart, De Bruijn, ETA)" >> release/README.txt
         echo "" >> release/README.txt
         echo "Flash command:" >> release/README.txt
         echo "esptool.py --chip esp32 --baud 921600 write_flash 0x1000 bootloader.bin 0x8000 partitions.bin 0xE000 boot_app0.bin 0x10000 firmware.bin" >> release/README.txt
