@@ -95,4 +95,3 @@ void settingsLoop() {
   }
   u8g2.sendBuffer();
 }
-
